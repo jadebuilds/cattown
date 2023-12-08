@@ -11,6 +11,17 @@ service Platform {
 
     rpc GetState(google.protobuf.Empty) returns (PlatformState);
 
+    // Endpoint to pick up a mouse. Will stop right away, not even respecting maximum acceleration,
+    // so please don't use this if there's a mouse engaged. Will block until the drive head has 
+    // reached the point or a hardware.
+    // Returns the position actually reached and a result. The position actually reached is 
+    // estimated from motor ticks, of course, and may not exactly match the position requested.
+    // New trajectories should use the returned Position as their starting point.
+    //
+    // TODO should we ask the platform controller to generate Trajectories even to go pick up a new 
+    // mouse?
+    rpc GoToPoint(Position) returns (Position, HardwareResult);
+    
     // Expected to be called quite regularly. Will return any errors thrown since the last invocation
     // (i.e. if there's been a hardware fault). Will not block (so that it can get called again in a 
     // busy loop based on the next cat detection update from OpenCV).
