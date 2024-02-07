@@ -17,6 +17,7 @@
  */
 
 #include <cmath> // Include cmath for NAN
+#include "kinematics.h"
 
 const LookupEntry lookupTable[108][108] = {
 
