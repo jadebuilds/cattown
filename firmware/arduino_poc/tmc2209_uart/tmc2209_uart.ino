@@ -12,7 +12,7 @@ const int PIN_EN = 2;
 
 void setup()
 {
-  pinMode(PIN_EN, OUTPUT);
+  // pinMode(PIN_EN, OUTPUT); may not need if using .enable()?
 
   Serial.begin(SERIAL_BAUD_RATE);
 
@@ -20,7 +20,18 @@ void setup()
 
   delay(10);
 
-  stepper_driver.setup(usart);
+  // Set up TMC2209 driver
+  stepper_driver.setup(usart, SERIAL_BAUD_RATE, TMC2209::SERIAL_ADDRESS_0);  // Set to whatever address (0 - 3)
+
+  // Enable driver
+  stepper_driver.enable();
+
+  // Configure features
+  stepper_driver.setMicrostepsPerStep(16);
+  stepper_driver.setRunCurrent(50);         // 50% of max
+  stepper_driver.setHoldCurrent(25);        // 25% of max
+  stepper_driver.enableStealthChop();       // Non-quiet ops (enables SpreadCycle for higher speeds)
+
   Serial.println("Done with setup");
 }
 
@@ -35,7 +46,7 @@ void loop()
   {
     Serial.println("Stepper driver is communicating but not setup!");
     Serial.println("Running setup again...");
-    stepper_driver.setup(usart);
+    stepper_driver.setup(usart, SERIAL_BAUD_RATE, TMC2209::SERIAL_ADDRESS_0); // Updated to use baud and serial address
   }
   else
   {
