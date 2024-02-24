@@ -39,6 +39,16 @@
 TMC2209Stepper driver(&TMC_USART, R_SENSE, DRIVER_ADDRESS);
 //TMC2209Stepper driver(SW_RX, SW_TX, R_SENSE, DRIVER_ADDRESS);
 
+const unsigned long runDuration = 3000; // Duration to run before stopping and changing direction, in milliseconds
+unsigned long lastStepTime = 0;
+unsigned long lastDirectionChangeTime = 0;
+int stepDelay = 1000;                   // Start with slow speed, maybe <500ms?
+int minStepDelay = 9;                   // Target speed (~2000 RPM?)
+int accelerationRate = 50;              // Acceleration rate
+int decelerationRate = 50;              // Deceleration rate
+bool direction = HIGH;                  // Direction flag, HIGH for one direction, LOW for the opposite
+bool isRunning = true;                  // Indicates of the motor is running or stopped
+
 void setup() {
   pinMode(EN_PIN, OUTPUT);
   pinMode(STEP_PIN, OUTPUT);
@@ -69,13 +79,51 @@ void setup() {
 bool shaft = false;
 
 void loop() {
-  // Run 5000 steps and switch direction in software
-  for (uint16_t i = 5000; i>0; i--) {
-    digitalWrite(STEP_PIN, HIGH);
-    delayMicroseconds(160);
-    digitalWrite(STEP_PIN, LOW);
-    delayMicroseconds(160);
+  unsigned long currentTime = millis();
+
+  // Check if it's time to decelerate and stop
+  if (isRunning && currentTime - lastDirectionChangeTime >= runDuration) {
+    isRunning = false;                      // Stop the motor after the run duration
   }
-  shaft = !shaft;
-  driver.shaft(shaft);
+
+  unsigned long currentStepTime = micros();
+  if (currentStepTime - lastStepTime >= stepDelay) {
+    if (isRunning) {
+      digitalWrite(STEP_PIN, HIGH);
+      delayMicroseconds(1);               // Ensure the stop pulse is registered
+      digitalWrite(STEP_PIN, LOW);
+      lastStepTime = currentStepTime;
+
+      // Accelerate to max speed if not at minStepDelay yet
+      if (stepDelay > minStepDelay) {
+        stepDelay -= accelerationRate;
+      }
+    } else {
+      // Decelerate to stop if running
+      if (stepDelay < maxStepDelay) {
+        stepDelay += decelerationRate;
+        digitalWrite(STEP_PIN, HIGH);
+        delayMicroseconds(1);           // Ensure the stop pulse is registered
+        digitalWrite(STEP_PIN, LOW);
+        lastStepTime = currentStepTime;
+      } else {
+        // Once stopped, change direction and reset for the next run
+        direction = !direction;
+        digitalWrite(DIR_PIN, direction);
+        lastDirectionChangeTime = currentTime;  // Reset the timer for direction change
+        isRunning = true;               // Ready to run again
+        stepDelay = 1000;               // Reset step delay to start slow again
+      }
+    }
+  }
+
+  // Run 5000 steps and switch direction in software
+//   for (uint16_t i = 5000; i>0; i--) {
+//     digitalWrite(STEP_PIN, HIGH);
+//     delayMicroseconds(160);
+//     digitalWrite(STEP_PIN, LOW);
+//     delayMicroseconds(160);
+//   }
+//   shaft = !shaft;
+//   driver.shaft(shaft);
 }
