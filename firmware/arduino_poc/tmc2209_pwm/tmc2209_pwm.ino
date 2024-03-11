@@ -1,8 +1,14 @@
 /*
- * Test code for interacting with the E-S Motor 4260 BL:
- * http://www.e-smotor.com/products/Brushless_DC_motor/2018/0402/32.html
- * This program runs the motor in a ramp pattern, counts encoder pulses, and
- * sends them back to the computer for processing in Python/PANDAS.
+ * Test code for interacting with the TMC2209.
+ * 
+ * I'm using the PWM peripheral to generate speed control, then
+ * reading it back into a separate feedback GPIO to count pulses
+ * with interrupts. That way I end up still using the CPU but in 
+ * interrupt context and thus I don't have to worry about jitter 
+ * in the motor STEP output -- the PWM peripheral will put out super
+ * clean and then counting will interleave with my loop() code.
+ * Note that loop() maybe gets jittered a little, but that shouldn't
+ * matter as we're not doing anything else real-time.
  */
 
 // Direct register access macros
@@ -15,9 +21,10 @@ const uint32_t PWM_CLOCK = 42e6;
 
 const uint32_t PULSES_PER_ROTATION = 1600; // 1/8 default microstep, 200 fullsteps per rotation
 
-const int PINS_FEEDBACK[2] = { 6, 13 };
-const int PIN_EN = 7;
-const int PIN_DIR = 5;
+// Stepper configuration
+const int PINS_FEEDBACK[2] = { 3, 6 };
+const int PINS_EN[2] = { 2, 5 };
+const int PINS_DIR[2] = { 4, 7 };
 
 
 struct MotorSpeeds {
@@ -28,11 +35,11 @@ struct MotorSpeeds {
 
 void setup() {
 
-  // Configure Pin 39 (PC7) for Peripheral B (PWMH0)
+  // Configure Pin 39 (PC7) for Peripheral B (PWMH2)
   WRITE_REG(&PIOC->PIO_PDR, PIO_PC7); // Disable PIO Control on PC7
   WRITE_REG(&PIOC->PIO_ABSR, READ_REG(&PIOC->PIO_ABSR) | PIO_PC7); // Select Peripheral B for PC7
 
-  // Configure Pin 41 (PC9) for Peripheral B (PWMH1)
+  // Configure Pin 41 (PC9) for Peripheral B (PWMH3)
   WRITE_REG(&PIOC->PIO_PDR, PIO_PC9); // Disable PIO Control on PC9
   WRITE_REG(&PIOC->PIO_ABSR, READ_REG(&PIOC->PIO_ABSR) | PIO_PC9); // Select Peripheral B for PC9
 
@@ -74,11 +81,14 @@ void setup() {
   Serial.begin(9600);
 
   // ~~~~~~~~~~~~~~~~ Pins ~~~~~~~~~~~~~~~~
-  pinMode(PIN_EN, OUTPUT);
-  pinMode(PIN_DIR, OUTPUT);
+  pinMode(PINS_EN[0], OUTPUT);
+  pinMode(PINS_EN[1], OUTPUT);
+  pinMode(PINS_DIR[0], OUTPUT);
+  pinMode(PINS_DIR[1], OUTPUT);
 
-  // enable it
-  digitalWrite(PIN_EN, LOW);
+  // enable them
+  digitalWrite(PINS_EN[0], LOW);
+  digitalWrite(PINS_EN[1], LOW);
 }
 
 
@@ -93,12 +103,12 @@ void loop() {
   uint32_t duty_pct;
   uint32_t num_ramp_steps = 20;
 
-  for (uint32_t f = 5000; f < 8000; f+= 100) {
+  for (uint32_t f = 2000; f < 6000; f+= 500) {
     setPWMFrequency(f);
 
     start_counting_speed();
     
-    delay(500);
+    delay(1000);
 
     char buffer[100]; // Ensure this buffer is large enough for the resulting string
     MotorSpeeds speeds = get_motor_speeds();  // Unpack the array out of the return struct
@@ -113,7 +123,7 @@ void loop() {
   }
 
   // dir = ~dir;
-  // digitalWrite(PIN_DIR, dir);
+  // digitalWrite(PINS_DIR, dir);
 }
 
 void feedback_pulse_0_isr() {
@@ -164,10 +174,10 @@ void setPWMFrequency(uint32_t targetFrequency) {
         return;
     }
 
-    // Disable the PWM channel 3 to configure (note: is this necessary??)
-    REG_PWM_DIS = PWM_DIS_CHID3;
+    // Disable PWM channels to configure (note: is this necessary??)
+    REG_PWM_DIS = PWM_DIS_CHID3 | PWM_DIS_CHID2;
 
-    // Configure the PWM clock (using clock A as an example)
+    // Configure thes PWM clock (using clock A as an example)
     REG_PWM_CLK = PWM_CLK_PREA(0) | PWM_CLK_DIVA(prescaler);
 
     // Set the period (CPRD) and duty cycle (CDTY) for channel 3
@@ -175,7 +185,12 @@ void setPWMFrequency(uint32_t targetFrequency) {
     REG_PWM_CPRD3 = period; // Set the period
     REG_PWM_CDTY3 = period / 2; // Set the duty cycle to 50%
 
-    // Enable the PWM channel 3
-    REG_PWM_ENA = PWM_ENA_CHID3;
+    // Set the period (CPRD) and duty cycle (CDTY) for channel 2
+    REG_PWM_CMR2 = PWM_CMR_CPRE_CLKA; // Use clock A for channel 2
+    REG_PWM_CPRD2 = period; // Set the period
+    REG_PWM_CDTY2 = period / 2; // Set the duty cycle to 50%
+
+    // Enable the PWM channels
+    REG_PWM_ENA = PWM_ENA_CHID3 | PWM_ENA_CHID2;
 }
 

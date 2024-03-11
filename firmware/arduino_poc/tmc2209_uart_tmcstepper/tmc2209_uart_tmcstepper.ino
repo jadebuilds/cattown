@@ -6,16 +6,18 @@
 
 #include <TMCStepper.h>
 
-#define EN_PIN            7 // Enable
-#define DIR_PIN           5 // Direction
+// MOTOR 0
+// #define EN_PIN            2 // Enable
+// #define DIR_PIN           4 // Direction
+// #define STEP_PIN          3 // Step
+// #define TMC_USART Serial3 // pins 14/15
+
+// MOTOR 1
+#define EN_PIN            5 // Enable
+#define DIR_PIN           7 // Direction
 #define STEP_PIN          6 // Step
-#define CS_PIN           42 // Chip select
-#define SW_MOSI          66 // Software Master Out Slave In (MOSI)
-#define SW_MISO          44 // Software Master In Slave Out (MISO)
-#define SW_SCK           64 // Software Slave Clock (SCK)
-#define SW_RX            63 // TMC2208/TMC2224 SoftwareSerial receive pin
-#define SW_TX            40 // TMC2208/TMC2224 SoftwareSerial transmit pin
-#define TMC_USART Serial1 // TMC2208/TMC2224 HardwareSerial port
+#define TMC_USART Serial2 // pins 16/17
+
 #define DEBUG_SERIAL Serial  // Serial connection
 
 #define DRIVER_ADDRESS 0b00 // TMC2209 Driver address according to MS1 and MS2
@@ -47,7 +49,7 @@ void setup() {
 
                                   // Enable one according to your setup
 //SPI.begin();                    // SPI drivers
-  TMC_USART.begin(115200);      // HW UART drivers
+  TMC_USART.begin(19200);      // HW UART drivers
   // driver.beginSerial(115200);     // SW UART drivers
 
   DEBUG_SERIAL.begin(115200);
@@ -59,18 +61,18 @@ void setup() {
   driver.toff(5);                 // Enables driver in software
   DEBUG_SERIAL.println("rms_current(600)");
   driver.rms_current(600);        // Set motor RMS current
-  driver.microsteps(16);          // Set microsteps to 1/16th
+  driver.microsteps(8);          // Set microsteps to 1/16th
 
 //driver.en_pwm_mode(true);       // Toggle stealthChop on TMC2130/2160/5130/5160
-//driver.en_spreadCycle(false);   // Toggle spreadCycle on TMC2208/2209/2224
-  driver.pwm_autoscale(true);     // Needed for stealthChop
+  driver.en_spreadCycle(false);   // Toggle spreadCycle on TMC2208/2209/2224
+  //driver.pwm_autoscale(true);     // Needed for stealthChop
 }
 
 bool shaft = false;
 
 void loop() {
   // Run 5000 steps and switch direction in software
-  for (uint16_t i = 5000; i>0; i--) {
+  for (uint16_t i = 2500; i>0; i--) {
     digitalWrite(STEP_PIN, HIGH);
     delayMicroseconds(160);
     digitalWrite(STEP_PIN, LOW);
@@ -78,4 +80,9 @@ void loop() {
   }
   shaft = !shaft;
   driver.shaft(shaft);
+  delayMicroseconds(10);
+  bool shaft_state = driver.shaft();
+  DEBUG_SERIAL.print("Shaft state: ");
+  DEBUG_SERIAL.print(shaft_state);
+  DEBUG_SERIAL.println();
 }
