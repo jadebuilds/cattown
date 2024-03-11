@@ -16,10 +16,8 @@
  * position is at larger X than the requested, we'll accelerate in the negative X direction, and so on.
  */
 
-#ifndef KINEMATICS_H
-#define KINEMATICS_H
-
-struct LookupEntry {
+struct LocalKinematics {
+    bool valid;
     float x;
     float y;
     float dl1_dx;
@@ -28,9 +26,5 @@ struct LookupEntry {
     float dl2_dy;
 };
 
-// The contents of the lookup table are populated in kinematics.cpp, of course.
-// The 'extern' tells files including this header to expect to find the LUT elsewhere in memory
-// rather than declaring a new LUT in situ.
-extern const LookupEntry lookupTable[108][108];
-
-#endif // KINEMATICS_H
+// The contents of the lookup table are populated in kinematics.cpp, of course (hence extern)
+extern const LocalKinematics lookupTable[108][108];
