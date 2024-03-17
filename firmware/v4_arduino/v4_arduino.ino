@@ -292,6 +292,9 @@ void setup() {
   motorState[0].driver.begin();
   motorState[1].driver.begin();
 
+  motorState[0].driver.microsteps(MICROSTEPS);
+  motorState[1].driver.microsteps(MICROSTEPS);
+
   // ~~~~~~~~~~~~~~~~ LCD ~~~~~~~~~~~~~~~~
 
 
