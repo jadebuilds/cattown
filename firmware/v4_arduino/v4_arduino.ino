@@ -24,6 +24,9 @@ const int DEBUG_UART_BAUD = 115200;
 // those channels)
 const int MAIN_LOOP_PERIOD_MILLIS = 100;  // used in a delay() call in each loop()
 
+const int PULLEY_DIAMETER_UM = 20000;  // 20 mm diameter pulley
+const int PULLEY_PERIMETER_UM = 62832;  // 20 mm * pi
+
 // How fast should a mouse accelerate? For my first pass I'll try 1G (9/8 m/s^2).
 // With a 25 mm pulley diameter that works out to 
 // dw/dt = a/r = (9.8 m/s^2) / (0.0125 m) * (60 s / 1 min) * (1 rev / 2π) = 7480 rpm/s
@@ -41,12 +44,6 @@ const int MAIN_LOOP_PERIOD_MILLIS = 100;  // used in a delay() call in each loop
 // Actually I want to accelerate much slower than that for testing. Let's do this (todo remove me)
 const int MAX_ACCEL_RPM_PER_S = 200;
 
-// How do pulses map to string length? Well, it's 12 pulses per rotation and 25 mm diameter:
-// (pi * 25 mm / rotation) / (12 pulses/rotation) = 6.54498 mm/pulse. That's not a nice round 
-// number. So I'm going to measure in **micrometers** for this conversion, which is a bizarre
-// choice of unit but I'm going for it and we'll see what comes of it.
-const int STRING_UM_PER_PULSE = 6545;
-
 // In testing I'm finding that I can't get my steppers to spin faster than this without 
 // starting to buzz and skip steps. Some work to do here around tuning SpreadCycle chopping
 // to try to get it to run faster (or possibly checking out some of the other TMC chips, 2130
@@ -56,6 +53,10 @@ const int MAX_NEG_RPM = -300;
 
 // Leaving at the default number of microsteps for the moment.
 const int MICROSTEPS = 8;
+
+// For 8 microsteps and a 20 mm pulley diameter, this is equal to about 39.27 um. That's too low
+// and introduces some rounding error. However when the pulley gets bigger it should be just fine
+const int STRING_UM_PER_PULSE = PULLEY_PERIMETER_UM / (MICROSTEPS * 200);
 
 // TMC2209 sense resistor, corresponding to the board it's on. Presumably in ohms?
 #define R_SENSE 0.11f // todo this is for SilentStepStick; assuming BigTreeTech has cloned this value?? but plz confirm
@@ -120,7 +121,8 @@ const MotorPins motorPins[2] = {
     5, // enable
     7, // direction
     6, // step feedback
-    0,  // Currently using as its own address on a separate UART
+    0,  // both pins left low also -- at one point I had this on address "1" of the same UART bus,
+        // but I've recently rewired the board to put them on separate UART buses at address 0
     Serial2  // Using RX2/TX2 on pins 16/17 (split out for convenience)
   }
 };
@@ -203,20 +205,21 @@ TMC2209Stepper driver_1(&motorPins[1].uart, R_SENSE, motorPins[1].driverAddress)
 //
 // So I'm just hard-coding the "zero string length" pulse count. Here's my math:
 // String length: sqrt((4 feet / 2)^2 + (82" / 2)^2) = 47.5" = 1206.7 mm
-// At 6.544 mm per pulse, that's 1206.7 / 6.544 = 184.3 pulses.
+// The stepper should give us 1600 pulses per rotation, and every rotation is currently
 // Note that this does not account for a bunch of things, such as the width of the 2x4s and the offset of 
 // the motors, and I'll need to do a more careful geometric accounting some time quite soon.
+int HALF_STRING_LENGTH_UM = 4 * 12 * 25400;
 MotorState motorState[2] = {
-  {driver_0, 0, 0, true, -184, CW},
-  {driver_1, 0, 0, true, -184, CW},
+  {driver_0, 0, 0, true, -1 * 200 * MICROSTEPS * HALF_STRING_LENGTH_UM / PULLEY_PERIMETER_UM, CW},
+  {driver_1, 0, 0, true, -1 * 200 * MICROSTEPS * HALF_STRING_LENGTH_UM / PULLEY_PERIMETER_UM, CW},
 };
 
-// todo should I structify these numbers too ("carriageState" maybe)?
-int targetSpeedXmmps = 0;  // In mm/s to keep it as a nice big integer
-int targetSpeedYmmps = 0;
-
-int instSpeedXmmps = 0; // todo is this needed
-int instSpeedYmmps = 0;
+// Some local state declared statically
+int stringLength_mm_q8 [2];  // in millimeters, Q24.8
+int stringLength_um[2];  // in inches, converted for the LUT (TODO redo the LUT in metric?)
+int stringLength_in[2];  // in inches, converted for the LUT (TODO redo the LUT in metric?)
+int x_in;
+int y_in;
 
 struct {
   bool up;
@@ -237,7 +240,7 @@ uint32_t temp_freq_readout[2] = { 0, 0 };
 // Utility function to occasionally read out what's going on.
 bool send_state_debug_message(void * /* unused */) { // n.b. function signature is set by the timer library
   char buffer[100]; // Ensure this buffer is large enough for the resulting string
-  snprintf(buffer, sizeof(buffer), "Motor 0: %d RPM / %d Hz; Motor 1: %d RPM / %d Hz", motorState[0].targetRpm, temp_freq_readout[0], motorState[1].targetRpm, temp_freq_readout[1]);
+  snprintf(buffer, sizeof(buffer), "Motor 0: %d RPM / %d Hz; Motor 1: %d RPM / %d Hz; L1: %d, L2: %d, x: %d, y: %d", motorState[0].targetRpm, temp_freq_readout[0], motorState[1].targetRpm, temp_freq_readout[1], stringLength_in[0], stringLength_in[1], x_in, y_in);
   Serial.println(buffer);
   snprintf(buffer, sizeof(buffer), "Target RPM: Motor 0: %d; Motor 1: %d", motorState[0].targetRpm, motorState[1].targetRpm);
   return true;
@@ -362,10 +365,6 @@ void setup() {
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ MAIN LOOP WOO ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-// Some local state declared statically
-int stringLength_mm_q8 [2];  // in millimeters, Q24.8
-int stringLength_in[2];  // in inches, converted for the LUT (TODO redo the LUT in metric?)
-
 void loop() {
   /*
    * I thought for a little while that we would do motor pulse generation/counting in the main loop,
@@ -411,23 +410,34 @@ void loop() {
   // This gets a little more complicated: we need to reach into the auto-generated LUT in kinematics.cpp
   // and look up mappings. I'm going to start with looking up the nearest based on the integral string length
   // and then worry about interpolation later.
-  else {
+
+  // // TODO call out to a calibration routine as appropriate (probably a little FSM?)
+  stringLength_um[0] = (motorState[0].encoderPulseCount - motorState[0].pulseCountZeroStringLength) * STRING_UM_PER_PULSE;
+  stringLength_um[1] = (motorState[1].encoderPulseCount - motorState[1].pulseCountZeroStringLength) * STRING_UM_PER_PULSE;
+
+  stringLength_in[0] = stringLength_um[0] / 25400;  // These are integers, so rounding down to the nearest inch
+  stringLength_in[1] = stringLength_um[1] / 25400;
+
+  LocalKinematics kinematics = lookupTable[stringLength_in[1]][stringLength_in[0]];
+
+  x_in = (int) kinematics.x;
+  y_in = (int) kinematics.y;
+
+  if (modeManual) {
+
+    // Manual mode: apply X/Y kinematics!
 
     // ****** TODO FINISH MEEEEEEE THANKS <3 ****** //
 
-
-    // TODO call out to a calibration routine as appropriate (probably a little FSM?)
-    // stringLength_um[0] = (motorState[0].encoderPulseCount - motorState[0].pulseCountZeroStringLength) * STRING_UM_PER_PULSE;
-    // stringLength_um[1] = (motorState[1].encoderPulseCount - motorState[1].pulseCountZeroStringLength) * STRING_UM_PER_PULSE;
-
-    // stringLength_in[0] = stringLength_um[0] / 25400;  // Note that this rounds down to the nearest inch
-    // stringLength_in[1] = stringLength_um[1] / 25400;
-
-    // TODO handle errors
-    // TODO debug
-
-    // LocalKinematics kinematics = lookupTable[stringLength_in[1]][stringLength_in[0]];
+    // // TODO handle errors
+    // // TODO debug
     
+    
+
+    // TODO rewrite the kinematics lib as integers
+
+    // rpm for string 0 = kinematics.dl1_dx * target_x_speed + kinematics.dl1_dy * target_y_speed
+    // rpm for string 1 = kinematics.dl2_dx * target_x_speed + kinematics.dl2_dy * target_y_speed
 
     // TODO look up in LUT
     // TODO resolve unit mismatch between LUT (inches, sigh) and string length calc in UM
@@ -495,37 +505,37 @@ void motor1_encoder_isr() {
 
 void joystick_down_isr() {
   joystickState.down = (digitalRead(PIN_JOYSTICK_DOWN) == LOW);
-  if (joystickState.down) {
-    lcd.setCursor(0,0);
-    lcd.print("Joystick down!  ");
-  }
+  // if (joystickState.down) {
+  //   lcd.setCursor(0,0);
+  //   lcd.print("Joystick down!  ");
+  // }
 }
 
 void joystick_up_isr() {
   joystickState.up = (digitalRead(PIN_JOYSTICK_UP) == LOW);
-  if (joystickState.up) {
-    lcd.setCursor(0,0);
-    lcd.print("Joystick up!    ");
-  }
+  // if (joystickState.up) {
+  //   lcd.setCursor(0,0);
+  //   lcd.print("Joystick up!    ");
+  // }
 }
 
 void joystick_left_isr() {
   joystickState.left = (digitalRead(PIN_JOYSTICK_LEFT) == LOW);
-  if (joystickState.left) {
-    lcd.setCursor(0,0);
-    lcd.print("Joystick left!  ");
-  }
+  // if (joystickState.left) {
+  //   lcd.setCursor(0,0);
+  //   lcd.print("Joystick left!  ");
+  // }
 }
 
 void joystick_right_isr() {
   joystickState.right = (digitalRead(PIN_JOYSTICK_RIGHT) == LOW);
-  if (joystickState.right) {
-    lcd.setCursor(0,0);
-    lcd.print("Joystick right! ");
-    Serial.println("Joystick right pressed");
-  } else {
-    Serial.println("Joystick right released");
-  }
+  // if (joystickState.right) {
+  //   lcd.setCursor(0,0);
+  //   lcd.print("Joystick right! ");
+  //   Serial.println("Joystick right pressed");
+  // } else {
+  //   Serial.println("Joystick right released");
+  // }
 }
 
 
@@ -533,20 +543,20 @@ void mouse_btn_isr() {
   int current_value = digitalRead(PIN_MOUSE_BTN);
   
   // TODO bringup code remove me
-  lcd.setCursor(0,0);
-  if (current_value == LOW) {
-    lcd.print("Mouse button!   ");
-  }
+  // lcd.setCursor(0,0);
+  // if (current_value == LOW) {
+  //   lcd.print("Mouse button!   ");
+  // }
 }
 
 void dodge_btn_isr() {
   int current_value = digitalRead(PIN_DODGE_BTN);
   
   // TODO bringup code remove me
-  lcd.setCursor(0,0);
-  if (current_value == LOW) {
-    lcd.print("Dodge button!   ");
-  }
+  // lcd.setCursor(0,0);
+  // if (current_value == LOW) {
+  //   lcd.print("Dodge button!   ");
+  // }
 }
 
 void manual_mode_sw_isr() {
