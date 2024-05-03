@@ -131,7 +131,8 @@ while cap.isOpened():
  
 	# Filter contours to allow only larger objects:
 	contour_areas = [cv.contourArea(c) for c in contours]
-	large_contours = [cnt for cnt, a in zip(contours,contour_areas) if a > min_contour_area and a < max_contour_area ]    centroids = [get_centroid(c) for c in large_contours]
+	large_contours = [cnt for cnt, a in zip(contours,contour_areas) if a > min_contour_area and a < max_contour_area ]
+	centroids = [get_centroid(c) for c in large_contours]
 
 	# initialize annoated frame:
 	frame_ct = frame.copy()
