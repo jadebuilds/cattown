@@ -70,9 +70,6 @@ def open_live_capture(id):
 min_contour_area = 2000
 max_contour_area = 20000
 
-
-backsub_thresh = 180 # Threshold for movement in background subtracted image
-
 # Leftover from reading test video file:
 # Process only subset of video:
 frame_start = 300
@@ -128,17 +125,18 @@ while True:
 	# Apply background subtraction
 	fg_mask = back_sub.apply(frame)
 
-	# apply global threshold to remove shadows
-	retval, mask_thresh = cv.threshold( fg_mask, backsub_thresh, 255, cv.THRESH_BINARY)
+	# Background subtract only contains values of 255 = moving foreground, 127 = shadows
+	# So apply threshold of 255 for foreground objects:
+	fg_mask = cv.compare(fg_mask, 255, cv.CMP_EQ)
 
 	# Binary erosion to remove small motion pixel groups
 	# set the kernal
 	kernel = cv.getStructuringElement(cv.MORPH_ELLIPSE, (3, 3))
 	# Apply erosion
-	mask_eroded = cv.morphologyEx(mask_thresh, cv.MORPH_OPEN, kernel)
+	fg_mask = cv.morphologyEx(fg_mask, cv.MORPH_OPEN, kernel)
 
 	# Find contours
-	contours, hierarchy = cv.findContours(mask_eroded, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)    
+	contours, hierarchy = cv.findContours(fg_mask, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)    
  
 	# Filter contours to allow only larger objects:
 	contour_areas = [cv.contourArea(c) for c in contours]
