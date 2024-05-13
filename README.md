@@ -1,11 +1,15 @@
 # cattown
 Code for Cat Town Kickstarter project
 
-# Controller Python Virtual Environment Setup Instructions
-Python 3.12.3
+# Poetry Environment Setup Instructions
+-Make sure Python 3.12.3 exists on the system
 
-Create a virtual environment (`python -m venv env`).
+-Install Poetry:
 
-Activate the virtual environment (`source env/bin/activate` on Unix or `env\Scripts\activate` on Windows).
+curl -sSL https://install.python-poetry.org/ | python3 -
 
-Install dependencies (`pip install -r requirements.txt`)
+May have to add this to path to run Poetry: `export PATH="/home/<YOUR USERNAME>/.local/bin:$PATH"`
+
+The Poetry lock file and pyproject.toml should all be pulled from git.
+
+You can now cd into `cattown/pi-controller` and run `poetry install` to make sure dependencies are installed.
