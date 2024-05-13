@@ -93,6 +93,12 @@ void setPwmFrequency(PwmChannel pwmChannel, uint32_t targetFrequency) {
       return;  // sorry!!! TODO please, i dunno, find a good fixed prescaler value or something
       // todo return an error code
     }
+    if (targetFrequency == 0) {
+      disablePwm(pwmChannel);
+      return;
+    } else {
+      enablePwm(pwmChannel);
+    }
 
     // The master clock on the SAM3X8E is 84MHz.
     // We need to find a prescaler and a period that can achieve the target frequency.
@@ -116,24 +122,27 @@ void setPwmFrequency(PwmChannel pwmChannel, uint32_t targetFrequency) {
         // Unable to achieve the target frequency with the available prescalers
         return; // todo return an error code!!
     }
-
+    if (pwmChannel == PWMH2) {
+      prescaler_a = prescaler;
+    } else {
+      prescaler_b = prescaler;
+    }
+    
     // Keep the prescaler for both channels (saved as global state) -- note that we could also bitmask this
     // out of REG_PWM_CLK? but this felt easier to do lol
     REG_PWM_CLK = PWM_CLK_PREA(0) | PWM_CLK_PREB(0) | PWM_CLK_DIVA(prescaler_a) | PWM_CLK_DIVB(prescaler_b);
 
     // Disable our channel
     if (pwmChannel == PWMH2) {
-      REG_PWM_DIS = PWM_DIS_CHID2;  // Disable the channel for a second. // todo figure out how to be continuous from last cycle!
-      REG_PWM_CPRD2 = period; // Set the period (sets upper limit on a counter in the PWM perimpheral)
-      REG_PWM_CDTY2 = period / INV_DUTY_CYCLE; // Set the duty cycle (sets the "go high" point on that same counter; nb output resets low at wraparound)
-      REG_PWM_ENA = PWM_ENA_CHID2; // I believe this is a "command register" -- ie won't deactivate other channels if they're not masked in
-
+      // The "update" registers are double-buffered and get applied when the PWM channel's counter wraps around;
+      // that lets us update values "in flight" while the channel is enabled and avoid discontinuities between 
+      // speed settings :D
+      REG_PWM_CPRDUPD2 = period; // Set the period (sets upper limit on a counter in the PWM perimpheral)
+      REG_PWM_CDTYUPD2 = period / INV_DUTY_CYCLE; // Set the duty cycle (sets the "go high" point on that same counter; nb output resets low at wraparound)
     }
     else if (pwmChannel == PWMH3) {
-      REG_PWM_DIS = PWM_DIS_CHID3;
-      REG_PWM_CPRD3 = period;
-      REG_PWM_CDTY3 = period / INV_DUTY_CYCLE;
-      REG_PWM_ENA = PWM_ENA_CHID3;
+      REG_PWM_CPRDUPD3 = period;
+      REG_PWM_CDTYUPD3 = period / INV_DUTY_CYCLE;
     }
 }
 

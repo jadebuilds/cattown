@@ -1,0 +1,16 @@
+{
+  "_checkout": "2022.6.3",
+  "_output_dir": "/Users/jade/Git/cattown/pi_controller",
+  "_repo_dir": "/Users/jade/.cookiecutters/cookiecutter-hypermodern-python",
+  "_template": "gh:cjolowicz/cookiecutter-hypermodern-python",
+  "author": "Feline Entertainment Systems",
+  "copyright_year": "2024",
+  "development_status": "Development Status :: 3 - Alpha",
+  "email": "jadebuildsthings@gmail.com",
+  "friendly_name": "Cat Town",
+  "github_user": "jadebuilds",
+  "license": "GPL-3.0",
+  "package_name": "cattown",
+  "project_name": "cattown",
+  "version": "0.0.0"
+}

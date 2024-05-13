@@ -26,5 +26,5 @@ struct LocalKinematics {
     float dl2_dy;
 };
 
-// The contents of the lookup table are populated in kinematics.cpp, of course (hence extern)
+// The contents of the lookup table are populated in kinematics.cpp, of course
 extern const LocalKinematics lookupTable[108][108];
