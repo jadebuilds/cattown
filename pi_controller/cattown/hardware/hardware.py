@@ -2,31 +2,25 @@ from typing import Optional, Callable
 from dataclasses import dataclass
 from datetime import datetime
 
-from ..core.physics import Position, Velocity, Acceleration
-from ..core.types import MouseID, Trajectory
+from ..core.types import Position, Velocity, Acceleration, MouseID, Trajectory
 from ..core.exceptions import HardwareError
 
 
-@dataclass
-class PlatformState:
-    timestamp: datetime  # when the PlatformState was observed
-    
-    active_mouse: Optional[MouseID]
-    
-    mouse_location: Position  # where the mouse is on the platform (in millimeters)
-    mouse_velocity: Velocity  # how fast the mouse is moving (mm per second)
-    mouse_acceleration: Acceleration  # mouse acceleration
-    
-
-
-class PlatformManager:
+class MotionController:
 
     def initialize_hardware(self):
         """
         Initialize the hardware platform however needed
         """
     
-    def get_state(self) -> PlatformState:
+    def get_size(self) -> Position:
+        """
+        Returns the size of the platform, as a Position describing the upper 
+        rightmost point on the board (where the lower left is assumed to be 0,0)
+        """
+        raise NotImplementedError
+
+    def get_state(self) -> MouseState:
         """
         Report the state of the platform.
 

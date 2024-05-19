@@ -1,27 +1,28 @@
 """Command-line interface."""
 import click
 
-from .platform_mgr import PlatformManager
+from .motion_system import MotionController
 from .cv import ComputerVisionSystem
 from .personalities.canned_pattern import DoesCannedPattern
 
-PERSONALITIES = [
-    # todo how does gcode work??? add some real gcode moves.
-    # (I see a text2gcodes() but not gcodes2text() in pygcode... does it only parse and not generate??????)
-    DoesCannedPattern([])
-]
 
 @click.command()
 @click.version_option()
 def main() -> None:
     """Does Cat Town!!!!"""
 
-    platform_manager = PlatformManager()
+    platform_manager = MotionController()
     platform_manager.initialize_hardware()
 
     cv = ComputerVisionSystem()
     cv.initialize_hardware()
     
+    personalities = [
+        # todo how does gcode work??? add some real gcode moves.
+        # (I see a text2gcodes() but not gcodes2text() in pygcode... does it only parse and not generate??????)
+        DoesCannedPattern([])
+    ]
+
     platform_manager.deploy_mouse(0)
     active_personality = PERSONALITIES[0]
 

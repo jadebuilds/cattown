@@ -14,3 +14,4 @@ class ComputerVisionSystem:
         """
         Tell us what the cat(s) are up to. Should return one CatState per identified cat.
         """
+
