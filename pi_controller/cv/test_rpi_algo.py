@@ -332,8 +332,8 @@ while True:
 				frame_ct = cv.line( frame_ct, (cent[0]-vary, cent[1]-varx), (cent[0]+vary, cent[1]+varx), (0, 0, 255), 2 )
 	
 	# Display the resulting frame
-	cv.imshow('Frame_final', frame_ct)
-	# show_frame(frame_ct)
+	# cv.imshow('Frame_final', frame_ct)
+	show_frame(frame_ct)
 
 	if WRITE_OUTPUT:
 		# Write it to the video output file:
