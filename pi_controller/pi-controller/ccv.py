@@ -19,11 +19,11 @@ class CatVision():
 		if not board_height_mm:
 			self.board_height_mm = round(25.4*48)
 
-		self.display_annotated = display_annotated
-		self.is_running = False
 		self.cam_id = None
-		self.show_orientation = False
-		self.show_contour = False
+		self.display_annotated = display_annotated
+		self.display_in_GUI = False
+		self.show_orientation = True
+		self.show_contour = True
 		self.show_bbox = True
 		self.show_centroids = True
 
@@ -41,7 +41,7 @@ class CatVision():
 
 		self.max_same_cat_move_dist_pix = 50
 		# clear memory of possible still cats after 3 minutes:
-		self.still_cat_clear_seconds = 20
+		self.still_cat_clear_seconds = 18
 
 		# If the mean and stdev of each color channel is within 10% of what it was previously, there's still a cat there:
 		# Caveat: watch out for poor lighting or when cat/board contrast is not high
@@ -67,6 +67,7 @@ class CatVision():
 		self.prev_mcats = [] # previous frame's moving cats
 		self.prev_scats = [] # previous frame's still cats
 
+		self.is_running = False # used to control the run/update loop
 		self.file_out = None # video output file stream
 
 
@@ -214,11 +215,15 @@ class CatVision():
 		return means, stdevs
 
 
-	def start(self, cam_id=0, filename=None, frame_start=0, output_filename=None):
+	def start(self, cam_id=0, filename=None, frame_start=0, output_filename=None, display_in_GUI=False):
 		'''
 		Initialize and start detecting cats
 			filename: Optional can load video from file using filename
 			frame_start: Optionally jump ahead this many frames in the file before opening
+			output_filename: If set, write annotated video to this filename
+			display_in_GUI: If running in XWindows or other GUI, set this to True to display in
+				an openCV window rather than attempt to display directly to the framebuffer as
+				we do on command line.  If running from command line, set this to False.
 
 		Currently this runs blocking forever, so needs to be in its own thread
 		'''
@@ -229,6 +234,8 @@ class CatVision():
 														  detectShadows = self.detect_shadows)
 
 		self.cam_id = cam_id
+		self.display_in_GUI = display_in_GUI
+
 		if filename is not None:
 			self.cap = cv.VideoCapture( filename )
 			# Advance the capture to skip frames
@@ -522,7 +529,7 @@ class CatVision():
 			# Draw eigenvectors of the covariance matrix scaled by eigenvalues
 			# Gets across "direction" axis of variance, and if they're equally sized it's symmetric
 			for c, cent in zip(cat_contours, cat_centroids):
-				eigenvecs = get_max_variance_vectors(c, cent)
+				eigenvecs = self.get_max_variance_vectors(c, cent)
 				for ev in eigenvecs:
 					vary = round(self.maxvar_scaling*ev[0])
 					varx = round(self.maxvar_scaling*ev[1])
@@ -530,10 +537,15 @@ class CatVision():
 					frame_ct = cv.line( frame_ct, (cent[0]-vary, cent[1]-varx), (cent[0]+vary, cent[1]+varx), (0, 0, 255), 2 )
 		
 		# Display the resulting frame
-		# Uncomment if running in XWindows or other GUI rather than command line
-		cv.imshow('Frame_final', frame_ct)
-		# Uncomment for command line frame buffer display:
-		# show_frame(frame_ct)
+		if self.display_in_GUI:
+			# If running in XWindows or other GUI rather than command line
+			cv.imshow('Frame_final', frame_ct)
+			# Need this as well in order to display CV window properly in GUI
+			if cv.waitKey(1) == ord('q'):
+				return self.cats, self.mice
+		else:
+			# Command line frame buffer display:
+			self.show_frame(frame_ct)
 
 		if self.file_out is not None:
 			# Write it to the video output file:
@@ -547,6 +559,7 @@ class CatVision():
 if __name__ == '__main__':
 	# Test run
 	ccv = CatVision()
+	# ccv.start(filename='/home/chris/cattown/2024-03-22 first trial.mov', display_in_GUI=True)
 	ccv.start()
 	time.sleep(30)
 	ccv.stop()
