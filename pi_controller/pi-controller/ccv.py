@@ -295,8 +295,8 @@ class CatVision():
 		self.is_running = True 
 
 		# ??? Do we spawn off run in its own thread now, or let that come from somewhere else?
-		# threading.Thread(target=self.run).start()
-		self.run()
+		threading.Thread(target=self.run).start()
+		# self.run()
 
 
 	def run(self):
@@ -558,8 +558,11 @@ class CatVision():
 
 if __name__ == '__main__':
 	# Test run
+	run_for_seconds = 30
+	print(f'Testing CatVision and intentionally stopping after {run_for_seconds} seconds:')
 	ccv = CatVision()
+	# Uncomment to play video file in cases where we can't access live camera feeed:
 	# ccv.start(filename='/home/chris/cattown/2024-03-22 first trial.mov', display_in_GUI=True)
 	ccv.start()
-	time.sleep(30)
+	time.sleep(run_for_seconds)
 	ccv.stop()
