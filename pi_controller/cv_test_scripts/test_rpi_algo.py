@@ -323,7 +323,7 @@ while True:
 	elif SHOW_ORIENTATION:
 		# Draw eigenvectors of the covariance matrix scaled by eigenvalues
 		# Gets across "direction" axis of variance, and if they're equally sized it's symmetric
-		for c, cent in zip(large_contours, centroids):
+		for c, cent in zip(cat_contours, cat_centroids):
 			eigenvecs = get_max_variance_vectors(c, cent)
 			for ev in eigenvecs:
 				vary = round(maxvar_scaling*ev[0])
