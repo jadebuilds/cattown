@@ -86,7 +86,7 @@ max_mouse_contour_area = 1000
 
 max_same_cat_move_dist_pix = 50
 # clear memory of possible still cats after 3 minutes:
-still_cat_clear_seconds = 180 
+still_cat_clear_seconds = 20 
 
 # If the mean and stdev of each color channel is within 10% of what it was previously, there's still a cat there:
 # Caveat: watch out for poor lighting or when cat/board contrast is not high
