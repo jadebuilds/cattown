@@ -23,7 +23,7 @@ class CatVision():
 		self.display_annotated = display_annotated
 		self.display_in_GUI = False
 		self.show_orientation = True
-		self.show_contour = True
+		self.show_contour = False
 		self.show_bbox = True
 		self.show_centroids = True
 
@@ -33,8 +33,8 @@ class CatVision():
 		# minimum and maximum object contour area to be tracked:
 		# TODO: Calculate these after Aruco transform to put in real units (cm^2)
 		# These will need updating regardless, just guesses based on original test camera and video
-		self.min_cat_contour_area = 1500
-		self.max_cat_contour_area = 20000
+		self.min_cat_contour_area = 10000
+		self.max_cat_contour_area = 250000
 
 		self.min_mouse_contour_area = 250
 		self.max_mouse_contour_area = 1000
@@ -43,13 +43,14 @@ class CatVision():
 		# clear memory of possible still cats after 3 minutes:
 		self.still_cat_clear_seconds = 18
 
+		# Still cat settings
 		# If the mean and stdev of each color channel is within 10% of what it was previously, there's still a cat there:
 		# Caveat: watch out for poor lighting or when cat/board contrast is not high
 		self.max_mean_diff_frac = 0.10
 		self.max_stdev_diff_frac = 0.15
 		# TODO: Apply some scaling with absolute pixel value so we don't get messed up by noise or quantization at low pixel values
 
-		# Amounts to scale direction vector..
+		# For scaling displayed direction vector..
 		self.maxvar_scaling = 0.02 # Since we don't divide x,y by their stdev, things get large
 
 
@@ -314,7 +315,8 @@ class CatVision():
 				continue	
 
 			cats, mice = self.find_cats(frame)
-			# TODO: Send gcode message here with cat and mouse info?
+			# TODO: Send protobuf message here with cat and mouse info?
+			# TODO: Copy these into queue
 
 		# If we're not running anymore, close up
 		if self.cap is not None:
@@ -485,10 +487,11 @@ class CatVision():
 
 		# Generate board coordinates for all centroids:
 		if self.transform_img_to_board is not None:
+			print('Found markers')
 			for cat in self.cats:
-				cat['centroid_board'] = im_x_y_to_board_x_y( cat['centorid'], transform_img_to_board )
+				cat['centroid_board'] = self.im_x_y_to_board_x_y( cat['centroid'], self.transform_img_to_board )
 			for mouse in self.mice:
-				mouse['centroid_board'] = im_x_y_to_board_x_y( mouse['centorid'], transform_img_to_board )
+				mouse['centroid_board'] = self.im_x_y_to_board_x_y( mouse['centroid'], self.transform_img_to_board )
 
 
 		# We're done if we're not displaying an annotated image
@@ -562,7 +565,7 @@ if __name__ == '__main__':
 	print(f'Testing CatVision and intentionally stopping after {run_for_seconds} seconds:')
 	ccv = CatVision()
 	# Uncomment to play video file in cases where we can't access live camera feeed:
-	# ccv.start(filename='/home/chris/cattown/2024-03-22 first trial.mov', display_in_GUI=True)
-	ccv.start()
+	ccv.start(filename='/home/chris/cattown/VID_20240525_180301.mp4', display_in_GUI=True)
+	# ccv.start()
 	time.sleep(run_for_seconds)
 	ccv.stop()
