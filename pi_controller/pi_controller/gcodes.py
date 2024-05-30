@@ -51,7 +51,7 @@ class LinearMove(GCode):
     def __init__(self, x_mm: float, y_mm: float, speed_mm_s: float) -> None:
         self.x_mm = x_mm
         self.y_mm = y_mm
-        self.speed_mm_ms = speed_mm_s
+        self.speed_mm_s = speed_mm_s
     
     def to_str(self) -> str:
         """
@@ -60,7 +60,7 @@ class LinearMove(GCode):
         use G1 (the "move while cutting") so that we can control speed
         with the F (feedrate) parameter.
         """
-        return f"G1 X{self.x_mm} Y{self.y_mm} F{self.speed_mm_ms}"
+        return f"G1 X{self.x_mm} Y{self.y_mm} F{self.speed_mm_s * 60}"  # note that F is feedrate per minute (!)
     
 class ArcMove(GCode):
 
