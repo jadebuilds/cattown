@@ -4,7 +4,7 @@ from custommap import generate_example
 import numpy as np
 from typing import Tuple, List, Optional
 from queue import PriorityQueue
-from custommap import generate_example
+from custommap import load_from_file, node_is_passable
 
 Node = Tuple[int, int]  # indices on the array (will map to real coordinates later)
 Path = List[Node]  # list of nodes to traverse (will turn into motion path later)
@@ -22,7 +22,7 @@ def get_neighbors(grid: np.ndarray, node: Node) -> List[Node]:
         neighbor_y = node[1] + direction[1]
 
         if 0 <= neighbor_x < grid.shape[0] and 0 <= neighbor_y < grid.shape[1]:
-            if grid[neighbor_x, neighbor_y] != 1:  # Check if it's not an obstacle
+            if node_is_passable(grid[neighbor_x, neighbor_y]):  # Check if it's not an obstacle
                 neighbors.append((neighbor_x, neighbor_y))
 
     return neighbors
@@ -68,7 +68,7 @@ def mark_path_on_grid(grid: np.ndarray, path: Path):
     return grid
 
 if __name__ == '__main__':
-    grid = generate_example()
+    grid = load_from_file('map.csv')
     
     start = (0, 0)
     goal = (11, 11)

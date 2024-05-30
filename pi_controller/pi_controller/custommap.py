@@ -1,6 +1,14 @@
 import numpy as np
 from typing import Tuple
 
+# Map values (not using an Enum for the moment because they're so clunky in Python)
+EMPTY = 0
+IMPASSABLE_TO_TOY = 1
+IMPASSABLE_TO_CARRIAGE = 2
+MOUSE_HOUSE_ENTRANCE = 3
+MOUSE_HOUSE_DESTINATION = 4
+
+
 def initialize_map(width_in: int, height_in: int) -> np.ndarray:
     # Create a 2D numpy array full of 0s
     grid = np.zeros((width_in, height_in), dtype=int)
@@ -32,4 +40,17 @@ def generate_example() -> np.ndarray:
     return grid
 
 def load_from_file(csv_filepath: str) -> np.ndarray:
-    return np.genfromtxt(csv_filepath, delimiter=',')
+    """
+    Load from a CSV download. Expecting to use the Google Sheet map here:
+    
+    https://docs.google.com/spreadsheets/d/1h3TzB2h-GPvKF6A5ktIeTxZr08u3RLS3S5u_wHjHqy4/edit#gid=0
+    """
+    map = np.genfromtxt(csv_filepath, delimiter=',')  # type: np.ndarray
+    return np.nan_to_num(map)
+
+
+def node_is_passable(node_value: int) -> bool:
+    return (
+        (node_value != IMPASSABLE_TO_TOY) and
+        (node_value != IMPASSABLE_TO_CARRIAGE)
+    )
