@@ -1,12 +1,19 @@
 from typing import List, Dict, Tuple, Optional
 from queue import PriorityQueue
-from custommap import start
+from custommap import generate_example
+import numpy as np
+from typing import Tuple, List, Optional
+from queue import PriorityQueue
+from custommap import generate_example
 
-def go_to_coords(grid: List[List[int]], start: Tuple[int, int], goal: Tuple[int, int]) -> List[Tuple[int, int]]:
-    a_star(grid, start, goal)
-    return
+Node = Tuple[int, int]  # indices on the array (will map to real coordinates later)
+Path = List[Node]  # list of nodes to traverse (will turn into motion path later)
 
-def get_neighbors(grid: List[List[int]], node: Tuple[int, int]):
+
+def go_to_coords(grid: np.ndarray, start: Node, goal: Node) -> Optional[Path]:
+    return a_star(grid, start, goal)
+
+def get_neighbors(grid: np.ndarray, node: Node) -> List[Node]:
     neighbors = []
     directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]  # Up, Down, Left, Right
 
@@ -14,13 +21,13 @@ def get_neighbors(grid: List[List[int]], node: Tuple[int, int]):
         neighbor_x = node[0] + direction[0]
         neighbor_y = node[1] + direction[1]
 
-        if 0 <= neighbor_x < len(grid) and 0 <= neighbor_y < len(grid[0]):
-            if grid[neighbor_x][neighbor_y] != "1":  # Check if it's not an obstacle
+        if 0 <= neighbor_x < grid.shape[0] and 0 <= neighbor_y < grid.shape[1]:
+            if grid[neighbor_x, neighbor_y] != 1:  # Check if it's not an obstacle
                 neighbors.append((neighbor_x, neighbor_y))
 
     return neighbors
 
-def a_star(grid: List[List[int]], start: Tuple[int, int], goal: Tuple[int, int]) -> List[Tuple[int, int]]:
+def a_star(grid: np.ndarray, start: Node, goal: Node) -> Optional[Path]:
     open_list = PriorityQueue()
     open_list.put((0, start))
     came_from = {}
@@ -44,37 +51,32 @@ def a_star(grid: List[List[int]], start: Tuple[int, int], goal: Tuple[int, int])
 
     return None  # No path found
 
-def heuristic(node:Tuple[int, int], goal: Tuple[int, int]) -> List[Tuple[int, int]]:
+def heuristic(node: Node, goal: Node) -> int:
     return abs(node[0] - goal[0]) + abs(node[1] - goal[1])  # Manhattan distance
 
-def reconstruct_path(came_from: Tuple[int, int], current: Tuple[int, int]) -> List[Tuple[int, int]]:
+def reconstruct_path(came_from: dict, current: Node) -> Path:
     path = []
     while current in came_from:
         path.append(current)
         current = came_from[current]
     path.append(current)  # Add start node
-    mark_path_on_grid(grid, path[::-1])
     return path[::-1]  # Return reversed path
 
-
-def mark_path_on_grid(grid: List[Tuple[int, int]], path: List[Tuple[int, int]]):
+def mark_path_on_grid(grid: np.ndarray, path: Path):
     for node in path:
-        grid[node[0]][node[1]] = 2
+        grid[node[0], node[1]] = 5
     return grid
 
 if __name__ == '__main__':
-    grid = start()
+    grid = generate_example()
     
     start = (0, 0)
     goal = (11, 11)
-    grid[start[0]][start[1]] = 'S'
-    grid[goal[0]][goal[1]] = 'G'
+    grid[start[0], start[1]] = 7
+    grid[goal[0], goal[1]] = 8
     
     go_to_coords(grid, start, goal)
 
     print("The map you have traversed!")
-    for row in grid:
-        print(' '.join(map(str, row)))
-    print()
-
+    print(grid)
     
