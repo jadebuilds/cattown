@@ -8,34 +8,91 @@
 #
 # This file may be distributed under the terms of the GNU GPLv3 license.
 
-
-import sys, socket, select, errno, time, json
+from abc import ABCMeta, abstractmethod
+import sys, socket, select, errno, time, json, math
 import threading
+from queue import Queue
 
-from .motion import MotionCommand
-
-
-def webhook_socket_create(uds_filename):
-    sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-    sock.setblocking(0)
-    sys.stderr.write("Waiting for connect to %s\n" % (uds_filename,))
-    while 1:
-        try:
-            sock.connect(uds_filename)
-        except socket.error as e:
-            if e.errno == errno.ECONNREFUSED:
-                time.sleep(0.1)
-                continue
-            sys.stderr.write("Unable to connect socket %s [%d,%s]\n"
-                             % (uds_filename, e.errno,
-                                errno.errorcode[e.errno]))
-            sys.exit(-1)
-        break
-    sys.stderr.write("Connection.\n")
-    return sock
+from .motion import MotionCommand, Point, DirectMove
 
 
-class KlipperSocket:
+class MotionDriver(metaclass=ABCMeta):
+
+    @abstractmethod
+    def get_current_position(self) -> Point:
+        """
+        Get the current location.
+        """
+
+    @abstractmethod    
+    def enqueue_motion(self, motion: MotionCommand):
+        """
+        Add motion to the queue.
+        """
+
+    @abstractmethod
+    def clear_queue(self):
+        """
+        Make a best effort to sweep the queue of upcoming moves. This will be 
+        """
+
+
+class MockMotionDriver(MotionDriver):
+
+    def __init__(self, speed_mm_s: float, update_rate_s: float = 0.1):
+        self.speed_mm_s = speed_mm_s
+        self.update_rate_s = update_rate_s
+        self.lock = threading.Lock()
+        self.mouse_location = Point(0.0, 0.0)
+        self.motion_queue = Queue()
+        self.current_motion = None
+        self.should_exit = threading.Event()
+        self.thread = threading.Thread(target=self._run, daemon=True)
+        self.thread.start()
+
+
+    def get_current_position(self) -> Point:
+        """
+        Get the current location.
+        """
+        with self.lock:
+            return self.mouse_location
+
+    def enqueue_motion(self, motion: MotionCommand):
+        """
+        Add motion to the queue.
+        """
+        with self.lock:
+            self.motion_queue.put(motion)
+
+    @abstractmethod
+    def clear_queue(self):
+        """
+        Make a best effort to sweep the queue of upcoming moves. This will be 
+        """
+
+
+    def _run(self):
+        while not self.should_exit:
+            time.sleep(self.update_rate_s)
+            if not self.current_motion:
+                self.current_motion = self.motion_queue.get()  # will block background thread if empty
+                if type(self.current_motion) is not DirectMove:
+                    raise NotImplementedError  # I'm only mocking DirectMoves for the moment (will worry about others later)
+                
+                # Calculate distance
+                x_distance = (self.current_motion.destination.x_mm - self.mouse_location.x_mm)
+                y_distance = (self.current_motion.destination.y_mm - self.mouse_location.y_mm)
+                total_distance = math.sqrt(x_distance**2 + y_distance**2)
+
+                # Update by some 
+                with self.lock:
+                    # TODO is this how this works?
+                    self.mouse_location.x_mm += (x_distance / total_distance) * (self.speed_mm_s * self.update_rate_s)
+                    self.mouse_location.y_mm += (y_distance / total_distance) * (self.speed_mm_s * self.update_rate_s)
+
+
+class KlipperSocket(MotionDriver):
 
     def __init__(self, socket_path: str):
         """
@@ -44,7 +101,7 @@ class KlipperSocket:
         socket_path can be found by running systemctl status | grep klipper ;
         it's passed to the Klipper executable using the -a flag,.
         """
-        self.webhook_socket = webhook_socket_create(socket_path)
+        self.webhook_socket = self._webhook_socket_create(socket_path)
         self.poll = select.poll()
         self.poll.register(self.webhook_socket, select.POLLIN | select.POLLHUP)
         self.socket_data = b""
@@ -52,18 +109,59 @@ class KlipperSocket:
         self.should_close = threading.Event()  # set() to stop the thread from running
         self.thread.start()
 
+        self.next_cmd_id = 0  # incrementing ID for commands
+        self.next_cmd_id_lock = threading.Lock()  # is this needed?
+
+        # TODO use objects/subscribe to figure out what's up
+
+    def get_current_position(self) -> Point:
+        raise NotImplementedError  # todo how do I do this???? maybe using objects/subscribe?
+
     def enqueue_motion(self, motion: MotionCommand):
         """
-        Send a Gcode
+        Enqueue a series of gcode commands to the printer
         """
-        cmd = json.dumps({
-            "id": 123, 
-            "method": "gcode/script", 
-            "params": {"script": " ".join(gcode.to_str() for gcode in motion.to_g_code())}
-        }, separators=(',', ':')
-        )
+        with self.next_cmd_id_lock:
+            cmd = json.dumps({
+                "id": self.next_cmd_id, 
+                "method": "gcode/script", 
+                # TODO does this work? how does one submit multiple g-codes, what's the delimiter?
+                # (jade to dig into the Klipper source)
+                # TODO also: should we submit multiple short scripts? that might make more sense bc that way
+                # we could get finer grained feedback on progress from Klipper
+                "params": {"script": " ".join(gcode.to_str() for gcode in motion.to_g_code())}
+            }, separators=(',', ':'))
+
+            self.next_cmd_id += 1
+        
         print(f"Sending: {cmd}")
         self.webhook_socket.send(cmd.encode('ascii') + b"\x03")
+
+    def clear_queue(self):
+        """
+        TODO: break down paths into bite size chunks, then enqueue and submit them chunk at a time
+        so that we don't have to ask Klipper to clear? I think gcode/restart will not work
+        """
+        raise NotImplementedError
+
+    def _webhook_socket_create(self, uds_filename):
+        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        sock.setblocking(0)
+        sys.stderr.write("Waiting for connect to %s\n" % (uds_filename,))
+        while 1:
+            try:
+                sock.connect(uds_filename)
+            except socket.error as e:
+                if e.errno == errno.ECONNREFUSED:
+                    time.sleep(0.1)
+                    continue
+                sys.stderr.write("Unable to connect socket %s [%d,%s]\n"
+                                % (uds_filename, e.errno,
+                                    errno.errorcode[e.errno]))
+                sys.exit(-1)
+            break
+        sys.stderr.write("Connection.\n")
+        return sock
 
     def _process_socket(self):
         data = self.webhook_socket.recv(4096)
