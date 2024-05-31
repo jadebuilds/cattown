@@ -23,13 +23,13 @@ class Rotation(Enum):
 class UseAbsoluteCoordinates(GCode):
     
     def to_str(self) -> str:
-        return "G91"
+        return "G90"
 
 
 class UseRelativeCoordinates(GCode):
 
     def to_str(self) -> str:
-        return "G90"
+        return "G91"
     
 
 class SetAccelerationLimit(GCode):
