@@ -17,6 +17,10 @@ class Point:  # assumed to use absolute millimeter coordinates
     x_mm: float
     y_mm: float
 
+# --------------------------------------------------------------------------- #
+# MOTION COMMANDS
+# --------------------------------------------------------------------------- #
+
 
 class MotionCommand(metaclass=ABCMeta):
     """
@@ -32,6 +36,7 @@ class MotionCommand(metaclass=ABCMeta):
         Render into a series of GCodes that can be sent to the printer
         """
 
+   
 class DirectMove(MotionCommand):
     ""
     
@@ -42,7 +47,7 @@ class DirectMove(MotionCommand):
 
     def to_g_code(self) -> List[GCode]:
         return [
-            UseAbsoluteCoordinates, 
+            UseAbsoluteCoordinates(), 
             LinearMove(x_mm=self.destination.x_mm, y_mm=self.destination.y_mm, speed_mm_s=self.speed_mm_s)
         ]
 
@@ -72,10 +77,17 @@ class RelativeMove(MotionCommand):
             y = -1 * self.distance_mm
 
         return [
-            UseRelativeCoordinates,  # temporary -- we'll put it back
+            UseRelativeCoordinates(),  # temporary -- we'll put it back
             LinearMove(x_mm=x, y_mm=y, speed_mm_s=self.speed_mm_s),
         ]
 
+
+
+# --------------------------------------------------------------------------- #
+# PATHING
+# --------------------------------------------------------------------------- #
+
+# More advanced MotionCommands that execute a path.
 
 class RoundedLineSegmentPath(MotionCommand):
     """
@@ -99,5 +111,3 @@ class RoundedLineSegmentPath(MotionCommand):
     def to_g_code(self) -> List[GCode]:
         raise NotImplementedError  # 😇 todo
     
-
-        
