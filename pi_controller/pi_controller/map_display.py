@@ -10,9 +10,6 @@ from .pathplanner import Node, Path, go_to_coords
 map = load_from_file('pi_controller/map.csv')
 print(map)
 
-path = go_to_coords(map, (1,1), (40, 80))
-print(path)
-
 fig, ax = plt.subplots()
 cax = ax.matshow(map, cmap='Grays')
 

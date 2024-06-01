@@ -9,9 +9,9 @@ Node = Tuple[int, int]  # indices on the array (will map to real coordinates lat
 Path = List[Node]  # list of nodes to traverse (will turn into motion path later)
 
 def go_to_coords(grid: np.ndarray, start: Node, goal: Node) -> Optional[Path]:
-    return a_star(grid, start, goal)
+    return _a_star(grid, start, goal)
 
-def get_neighbors(grid: np.ndarray, node: Node) -> List[Node]:
+def _get_neighbors(grid: np.ndarray, node: Node) -> List[Node]:
     neighbors = []
     directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]  # Up, Down, Left, Right
 
@@ -25,34 +25,34 @@ def get_neighbors(grid: np.ndarray, node: Node) -> List[Node]:
 
     return neighbors
 
-def a_star(grid: np.ndarray, start: Node, goal: Node) -> Optional[Path]:
+def _a_star(grid: np.ndarray, start: Node, goal: Node) -> Optional[Path]:
     open_list = PriorityQueue()
     open_list.put((0, start))
     came_from = {}
     g_score = {start: 0}
-    f_score = {start: heuristic(start, goal)}
+    f_score = {start: _heuristic(start, goal)}
 
     while not open_list.empty():
         _, current = open_list.get()
 
         if current == goal:
-            return reconstruct_path(came_from, current)
+            return _reconstruct_path(came_from, current)
 
-        for neighbor in get_neighbors(grid, current):
+        for neighbor in _get_neighbors(grid, current):
             tentative_g_score = g_score[current] + 1  # assuming uniform cost
 
             if neighbor not in g_score or tentative_g_score < g_score[neighbor]:
                 came_from[neighbor] = current
                 g_score[neighbor] = tentative_g_score
-                f_score[neighbor] = g_score[neighbor] + heuristic(neighbor, goal)
+                f_score[neighbor] = g_score[neighbor] + _heuristic(neighbor, goal)
                 open_list.put((f_score[neighbor], neighbor))
 
     return None  # No path found
 
-def heuristic(node: Node, goal: Node) -> int:
+def _heuristic(node: Node, goal: Node) -> int:
     return abs(node[0] - goal[0]) + abs(node[1] - goal[1])  # Manhattan distance
 
-def reconstruct_path(came_from: dict, current: Node) -> Path:
+def _reconstruct_path(came_from: dict, current: Node) -> Path:
     path = []
     while current in came_from:
         path.append(current)
