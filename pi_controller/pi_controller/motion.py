@@ -47,7 +47,6 @@ class DirectMove(MotionCommand):
 
     def to_g_code(self) -> List[GCode]:
         return [
-            UseAbsoluteCoordinates(), 
             LinearMove(x_mm=self.destination.x_mm, y_mm=self.destination.y_mm, speed_mm_s=self.speed_mm_s)
         ]
 
@@ -79,6 +78,7 @@ class RelativeMove(MotionCommand):
         return [
             UseRelativeCoordinates(),  # temporary -- we'll put it back
             LinearMove(x_mm=x, y_mm=y, speed_mm_s=self.speed_mm_s),
+            UseAbsoluteCoordinates(),  # let's default to absolute coordinates please!!!
         ]
 
 

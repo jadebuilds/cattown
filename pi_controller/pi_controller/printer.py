@@ -9,11 +9,13 @@
 # This file may be distributed under the terms of the GNU GPLv3 license.
 
 from abc import ABCMeta, abstractmethod
+from typing import Union
 import sys, socket, select, errno, time, json, math
 import threading
 from queue import Queue
 
 from .motion import MotionCommand, Point, DirectMove
+from .gcodes import GCode, UseAbsoluteCoordinates
 
 
 class MotionDriver(metaclass=ABCMeta):
@@ -109,33 +111,36 @@ class KlipperSocket(MotionDriver):
         self.should_close = threading.Event()  # set() to stop the thread from running
         self.thread.start()
 
+        # keep an integer command id
         self.next_cmd_id = 0  # incrementing ID for commands
         self.next_cmd_id_lock = threading.Lock()  # is this needed?
+
+        # Default to absolute coordinates
+        self.enqueue_motion(UseAbsoluteCoordinates())
 
         # TODO use objects/subscribe to figure out what's up
 
     def get_current_position(self) -> Point:
         raise NotImplementedError  # todo how do I do this???? maybe using objects/subscribe?
 
-    def enqueue_motion(self, motion: MotionCommand):
+    def enqueue_motion(self, motion: Union[MotionCommand, GCode]):
         """
         Enqueue a series of gcode commands to the printer
         """
-        with self.next_cmd_id_lock:
-            cmd = json.dumps({
-                "id": self.next_cmd_id, 
+        if isinstance(motion, MotionCommand):
+            gcodes = motion.to_g_code()  # type: List[GCode]
+        elif isinstance(motion, GCode):
+            gcodes = [motion]  # because sometimes we want to enqueue like just a UseAbsoluteCoordinates
+
+        for gcode in gcodes:  # todo figure out how to submit them all as scripts
+            self._send_command({
                 "method": "gcode/script", 
                 # TODO does this work? how does one submit multiple g-codes, what's the delimiter?
                 # (jade to dig into the Klipper source)
                 # TODO also: should we submit multiple short scripts? that might make more sense bc that way
                 # we could get finer grained feedback on progress from Klipper
-                "params": {"script": " ".join(gcode.to_str() for gcode in motion.to_g_code())}
-            }, separators=(',', ':'))
-
-            self.next_cmd_id += 1
-        
-        print(f"Sending: {cmd}")
-        self.webhook_socket.send(cmd.encode('ascii') + b"\x03")
+                "params": {"script": gcode.to_str()}
+            })
 
     def clear_queue(self):
         """
@@ -143,6 +148,15 @@ class KlipperSocket(MotionDriver):
         so that we don't have to ask Klipper to clear? I think gcode/restart will not work
         """
         raise NotImplementedError
+
+    def _send_command(self, command: dict):
+        with self.next_cmd_id_lock:
+                command['id'] = self.next_cmd_id
+                self.next_cmd_id += 1
+        
+        cmd_str = json.dumps(command, separators=(',', ':'))
+        print(f"Sending: {cmd_str}")
+        self.webhook_socket.send(cmd_str.encode('ascii') + b"\x03")
 
     def _webhook_socket_create(self, uds_filename):
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
