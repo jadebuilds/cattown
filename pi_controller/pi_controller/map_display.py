@@ -4,8 +4,8 @@ import matplotlib.animation as animation
 import threading
 import time
 
-from custommap import load_from_file
-from pathplanner import Node, Path, go_to_coords
+from .custommap import load_from_file
+from .pathplanner import Node, Path, go_to_coords
 
 map = load_from_file('pi_controller/map.csv')
 print(map)
