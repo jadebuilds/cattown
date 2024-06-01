@@ -64,7 +64,7 @@ class LinearMove(GCode):
     
 class ArcMove(GCode):
 
-    def __init__(self, x_mm: float, y_mm: float, i_mm: float, j_mm: float, clockwise: bool) -> None:
+    def __init__(self, x_mm: float, y_mm: float, i_mm: float, j_mm: float, clockwise: bool, speed_mm_s: float) -> None:
         """
         These are surprisingly confusing to me.
 
@@ -77,5 +77,13 @@ class ArcMove(GCode):
         There's a great visualization of this in the Marlin docs:
         https://marlinfw.org/docs/gcode/G002-G003.html
         """
+        self.x_mm = x_mm
+        self.y_mm = y_mm
+        self.i_mm = i_mm
+        self.j_mm = j_mm
+        self.clockwise = clockwise
+        self.speed_mm_s = speed_mm_s
 
-        
+    def to_str(self) -> str:
+        cmd = "G2" if self.clockwise else "G3"
+        return f"{cmd} X{self.x_mm} Y{self.y_mm} I{self.i_mm} J{self.j_mm} F{self.speed_mm_s}"

@@ -1,5 +1,6 @@
 import numpy as np
 from typing import Tuple
+from dataclasses import dataclass
 
 # Map values (not using an Enum for the moment because they're so clunky in Python)
 EMPTY = 0
@@ -7,6 +8,16 @@ IMPASSABLE_TO_TOY = 1
 IMPASSABLE_TO_CARRIAGE = 2
 MOUSE_HOUSE_ENTRANCE = 3
 MOUSE_HOUSE_DESTINATION = 4
+
+
+@dataclass
+class MapConfig:
+    map_grid_spacing_mm: float  # For conversion between map locations (Nodes, int) and physical locations (Points, float)
+    map_x_offset: float  # I think we'll probably need this to calibrate against the physical frame
+    map_y_offset: float  # ""
+
+
+OPEN_SAUCE_MAP_CONFIG = MapConfig(50.0, 0.0, 0.0)  # using a 50 mm spacing
 
 
 def initialize_map(width_in: int, height_in: int) -> np.ndarray:
@@ -54,3 +65,4 @@ def node_is_passable(node_value: int) -> bool:
         (node_value != IMPASSABLE_TO_TOY) and
         (node_value != IMPASSABLE_TO_CARRIAGE)
     )
+

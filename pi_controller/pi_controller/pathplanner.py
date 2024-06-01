@@ -1,14 +1,12 @@
 from typing import List, Dict, Tuple, Optional
 from queue import PriorityQueue
-from custommap import generate_example
 import numpy as np
 from typing import Tuple, List, Optional
 from queue import PriorityQueue
-from custommap import load_from_file, node_is_passable
+from .custommap import load_from_file, node_is_passable
 
 Node = Tuple[int, int]  # indices on the array (will map to real coordinates later)
 Path = List[Node]  # list of nodes to traverse (will turn into motion path later)
-
 
 def go_to_coords(grid: np.ndarray, start: Node, goal: Node) -> Optional[Path]:
     return a_star(grid, start, goal)
@@ -62,10 +60,6 @@ def reconstruct_path(came_from: dict, current: Node) -> Path:
     path.append(current)  # Add start node
     return path[::-1]  # Return reversed path
 
-def mark_path_on_grid(grid: np.ndarray, path: Path):
-    for node in path:
-        grid[node[0], node[1]] = 5
-    return grid
 
 if __name__ == '__main__':
     grid = load_from_file('map.csv')
