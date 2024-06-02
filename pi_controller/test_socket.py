@@ -3,11 +3,6 @@ from pi_controller.motion import DirectMove, RelativeMove, Point, SimpleSquiggle
 import time
 
 k = KlipperSocket('/home/fes/printer_data/comms/klippy.sock')
-# k.enqueue_motion(DirectMove(Point(0, 0), speed_mm_s=1000))
-# k.enqueue_motion(DirectMove(Point(0, 100), speed_mm_s=1000))
-# k.enqueue_motion(DirectMove(Point(100, 100), speed_mm_s=1000))
-# k.enqueue_motion(DirectMove(Point(100, 0), speed_mm_s=1000))
-# k.enqueue_motion(DirectMove(Point(0, 0), speed_mm_s=1000))
 
 squiggle = SimpleSquigglePath(
     map_path=[
@@ -18,8 +13,8 @@ squiggle = SimpleSquigglePath(
         (1, 1), (1, 2), (2, 2), (3, 2), 
         (3, 3), (3, 4), (4, 4),
     ],
-    map_config=MapConfig(20., 15., 15.),
-    speed_mm_s=3000
+    map_config=MapConfig(50., 62., 47.),
+    speed_mm_s=500
 )
 
 k.enqueue_motion(squiggle)

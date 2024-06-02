@@ -106,6 +106,14 @@ class SimpleSquigglePath(MotionCommand):
     A funky lil pass at "simplest possible wiggly mouse-like motion."
     Converts direct motion into 45º arcs, joining one segment to the next
     so that the mouse corners well.
+
+    Note that the bugs were kinda annoying to iron out here and I ended up
+    relying heavily on this interactive G-Code viewer here:
+
+    https://ncviewer.com/
+
+    It's so good, lets you plot the whole path and tweak and re-plot and stuff.
+    Try it out! Don't develop without it or similar :)
     """
 
     def __init__(self, map_path: Path, map_config: MapConfig, speed_mm_s: float):
@@ -207,8 +215,8 @@ class SimpleSquigglePath(MotionCommand):
         # Final segment! We don't care about preparing an upcoming corner (assuming we'll stop), so this can just be a full arc:
         # TODO should we worry about making these paths play nicely with one another? IDK
         gcodes.append(self._full_arc(
-            start=self.map_path[segment_num],
-            end=self.map_path[segment_num + 1],
+            start=self.map_path[-2],
+            end=self.map_path[-1],
             clockwise=last_arc_clockwise if last_segment_corner else not last_arc_clockwise  # we still care about this tho
             ))
 
@@ -231,10 +239,10 @@ class SimpleSquigglePath(MotionCommand):
         # TODO there's gotta be a cleaner way to do this!!
         if direction == RIGHT:
             i = 0.5
-            j = 0.5 if clockwise else - 0.5
+            j = -0.5 if clockwise else 0.5
         elif direction == LEFT:
             i = -0.5
-            j = -0.5 if clockwise else 0.5
+            j = 0.5 if clockwise else -0.5
         elif direction == UP:
             j = 0.5
             i = 0.5 if clockwise else -0.5
@@ -307,7 +315,7 @@ if __name__ == "__main__":
             (1, 1), (1, 2), (2, 2), (3, 2), (3, 3),
             (3, 4), (4, 4),
         ],
-        map_config=MapConfig(20., 15., 15.),
+        map_config=MapConfig(10., 0., 0.),
         speed_mm_s=10000
     )
     # Points:
@@ -318,4 +326,5 @@ if __name__ == "__main__":
 
     gcodes = squiggle.to_g_code()
     for i, gcode in zip(range(len(gcodes)), gcodes):
-        print(f"{i}: {gcode.to_str()}")
+        #print(f"{i+1}: {gcode.to_str()}")
+        print(f"{gcode.to_str()}")  # for g-code plotter at https://ncviewer.com/
