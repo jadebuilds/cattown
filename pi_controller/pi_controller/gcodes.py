@@ -86,4 +86,5 @@ class ArcMove(GCode):
 
     def to_str(self) -> str:
         cmd = "G2" if self.clockwise else "G3"
-        return f"{cmd} X{self.x_mm} Y{self.y_mm} I{self.i_mm} J{self.j_mm} F{self.speed_mm_s}"
+        return f"{cmd} X{self.x_mm} Y{self.y_mm} I{self.i_mm} J{self.j_mm} F{self.speed_mm_s * 60}"  # note that F is feedrate per minute (!)
+ 
