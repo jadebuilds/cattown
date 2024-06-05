@@ -58,6 +58,7 @@ class Game:
                     self.fig.canvas.draw() 
                     self.game_active = False 
 
+    # cursor move, not the mouse toy. 
     def on_mouse_move(self, event):
         if event.inaxes:
             x, y = round(event.xdata), round(event.ydata)
@@ -74,6 +75,7 @@ class Game:
                 cat_is_close = abs(self.cat_location[0] - self.mouse_location[0]) or abs(self.cat_location[1] - self.mouse_location[1]) <= 6
                 mouse_is_on_map = 0 <= x < self.map.shape[0] and 0 <= y < self.map.shape[1]
                 if cat_is_close and mouse_is_on_map:
+                    self.mouse_location = self.path.pop(0)
                     threading.Thread(target=self.update_path).start()
 
     def update_path(self):

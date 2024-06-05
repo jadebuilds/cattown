@@ -22,7 +22,7 @@ class PathFinder:
     def redraw_path(self, start: Node, cat_location: Node) -> Optional[Path]:
         self.grid = add_obstacle(self.grid, cat_location, 2, 2)
         goal = self._get_random_passable_node()
-        print(goal)
+        # print(goal)
         return self.go_to_coords(start, goal)
 
     def go_to_coords(self, start: Node, goal: Node) -> Optional[Path]:
