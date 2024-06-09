@@ -22,7 +22,7 @@ class Direction(Enum):
 
 
 @dataclass
-class Point:  # assumed to use absolute millimeter coordinates
+class Point:  # A physical location on the board, measured in millimeters.
     x_mm: float
     y_mm: float
 

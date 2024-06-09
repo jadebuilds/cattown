@@ -10,9 +10,8 @@ import numpy as np
 import random
 from queue import PriorityQueue
 
-from .custommap import load_from_file, node_is_passable, add_obstacle
+from .custommap import load_from_file, node_is_passable, add_obstacle, Node
 
-Node = Tuple[int, int]
 Path = List[Node]
 
 class PathFinder:

@@ -9,12 +9,16 @@ import numpy as np
 from typing import Tuple
 from dataclasses import dataclass
 
+from .motion import Point  # point in millimeters
+
 # Map values (not using an Enum for the moment because they're so clunky in Python)
-EMPTY = 0
-IMPASSABLE_TO_TOY = 1
-IMPASSABLE_TO_CARRIAGE = 2
+PASSABLE = 0
+INACCESSIBLE = 1
+IMPASSABLE = 2
 MOUSE_HOUSE_ENTRANCE = 3
-MOUSE_HOUSE_DESTINATION = 4
+
+
+Node = Tuple[int, int]  # type wrapper for positions on the grid. TODO syntactic sugar for element-wise add/subtract??
 
 
 @dataclass
@@ -69,7 +73,20 @@ def load_from_file(csv_filepath: str) -> np.ndarray:
 
 def node_is_passable(node_value: int) -> bool:
     return (
-        (node_value != IMPASSABLE_TO_TOY) and
-        (node_value != IMPASSABLE_TO_CARRIAGE)
+        (node_value != INACCESSIBLE) and
+        (node_value != IMPASSABLE)
     )
 
+def to_coordinates(node: Node, map_config: MapConfig) -> Point:
+    """
+    Convert a grid node on the map (X, Y as integer coordinates) to a physical
+    position on the board (X, Y in millimeters) using what we know about the size 
+    and position of the map grid.
+
+    Not hard, just figured I'd wrap it so we don't have to do it over and over again!
+    """
+
+    return Point(
+        x_mm=node[0] * map_config.map_grid_spacing_mm + map_config.map_x_offset,
+        y_mm=node[1] * map_config.map_grid_spacing_mm + map_config.map_y_offset,
+    )
