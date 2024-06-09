@@ -39,16 +39,19 @@ class Game:
 
     def animate(self, i):
         with self.lock:
-            x, y = zip(*self.path)
-            self.mouse.set_data([self.mouse_location[1]], [self.mouse_location[0]])
-            self.cat.set_data([self.cat_location[1]], [self.cat_location[0]])
-            self.path_line.set_data(y, x)
-            if not self.game_active:
-                return self.mouse, self.cat, self.path_line, self.game_over_text
+            if self.path:
+                x, y = zip(*self.path)
+                self.mouse.set_data([self.mouse_location[1]], [self.mouse_location[0]])
+                self.cat.set_data([self.cat_location[1]], [self.cat_location[0]])
+                self.path_line.set_data(y, x)
+                if not self.game_active:
+                    return self.mouse, self.cat, self.path_line, self.game_over_text
         return self.mouse, self.cat, self.path_line
 
     def _advance_path(self):
-        while len(self.path) > 1 and self.game_active:
+        while self.game_active:
+            if len(self.path) < 2: 
+                self.update_path()
             time.sleep(0.1)
             with self.lock:
                 self.mouse_location = self.path.pop(0)
