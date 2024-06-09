@@ -10,9 +10,9 @@ from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
 from typing import List, Tuple
+
 from .gcodes import GCode, UseAbsoluteCoordinates, UseRelativeCoordinates, LinearMove, ArcMove
-from .pathplanner import Path, Node
-from .custommap import MapConfig
+from .constants import Path, Node, MapConfig
 
 class Direction(Enum):
     Left = "l"

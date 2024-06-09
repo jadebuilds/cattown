@@ -1,3 +1,11 @@
+# map_display.py
+# 
+# Emulator, lets us test the paths we've drawn using custommap and pathplanner 
+# module. Uses matplot for animations. Can use cursor as the cat to see how the 
+# the pathplanner will react. 
+# 
+# Author: Zoda
+
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
@@ -20,9 +28,9 @@ class Game:
         self.game_over_text = self.ax.text(0.5, 0.5, '', transform=self.ax.transAxes, ha='center', va='center', color='red', fontsize=16, bbox={'facecolor': 'white', 'alpha': 0.5, 'pad': 10})
         self.game_active = True
         
-        self.mouse_location = (1, 1)
-        self.cat_location = (40, 40)
-        self.mouse_goal_location = (40, 82)
+        self.mouse_location = (6, 5)
+        self.cat_location = (10, 13)
+        self.mouse_goal_location = (6, 8)
 
         self.path_finder = PathFinder('pi_controller/map.csv')
         self.path = self.path_finder.go_to_coords(self.mouse_location, self.mouse_goal_location)

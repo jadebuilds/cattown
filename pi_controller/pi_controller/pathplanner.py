@@ -5,14 +5,13 @@
 # Author: Zoda
 
 
-from typing import List, Dict, Tuple, Optional
+from typing import List, Dict, Optional
 import numpy as np
 import random
 from queue import PriorityQueue
 
+from .constants import Node, Path
 from .custommap import load_from_file, node_is_passable, add_obstacle, Node
-
-Path = List[Node]
 
 class PathFinder:
     def __init__(self, map_file: str):
