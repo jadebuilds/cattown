@@ -1,3 +1,10 @@
+# custommap.py
+# 
+# Definition, load from file, and basic operations on our custom map type
+# (a numpy array representing a grid of tiles on the front surface of the toy).
+# 
+# Author: Zoda
+
 import numpy as np
 from typing import Tuple
 from dataclasses import dataclass

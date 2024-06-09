@@ -1,3 +1,10 @@
+# pathplanner.py
+#
+# Path planning along the map using A* search.
+# 
+# Author: Zoda
+
+
 from typing import List, Dict, Tuple, Optional
 import numpy as np
 import random

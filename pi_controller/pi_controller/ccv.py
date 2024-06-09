@@ -1,6 +1,9 @@
 # Cat computer vision module
 # Motion track using background / foreground segmentation of moving objects and still objects that were moving
 # Initially copy/pasted from cv_test_scripts/test_rpi_algo.py
+# 
+# Author: Chris
+
 # TODO: Add FPS counter
 import numpy as np
 import cv2 as cv

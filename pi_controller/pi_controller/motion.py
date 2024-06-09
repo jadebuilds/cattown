@@ -1,3 +1,11 @@
+# motion.py
+#
+# Higher-level motion classes that take more abstract directions, such as
+# map paths, and convert to movement sequences of gcodes.
+# 
+# Author: Jade
+
+
 from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass
 from enum import Enum

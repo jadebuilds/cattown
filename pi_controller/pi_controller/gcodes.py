@@ -1,6 +1,9 @@
-"""
-Representation of gcode
-"""
+# gcodes.py
+#
+# Representation of gcode operations themselves as classes.
+# (Note: I think this ought to exist somewhere? But I haven't found it?)
+#
+# Author: Jade
 
 from abc import ABCMeta, abstractmethod
 from enum import Enum

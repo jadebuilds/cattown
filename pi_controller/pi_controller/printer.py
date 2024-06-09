@@ -1,12 +1,10 @@
-#!/usr/bin/env python3
+# printer.py
 # 
-# 
-# 
-# Copyright (C) 2024 Jack "Jade" Weinstein
+# Websocket control over Klipper 3D printing software
+# in order to send gcodes to a control board running Klipper.
 #
-# Adapted from whconsole.py by Kevin O'Connor <kevin@koconnor.net> (# Copyright (C) 2020  )
-#
-# This file may be distributed under the terms of the GNU GPLv3 license.
+# Author: Jade
+
 
 from abc import ABCMeta, abstractmethod
 from typing import Union
@@ -198,3 +196,13 @@ class KlipperSocket(MotionDriver):
 
     def stop(self):
         self.should_close.set()
+
+
+class MoonrakerAPI(MotionDriver):
+
+    def __init__(self, hostname: str):
+        """
+        Takes the hostname of the Pi that we're communicating with and 
+        sends it G-code through the .
+        """
+
