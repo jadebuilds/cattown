@@ -7,7 +7,7 @@
 from dataclasses import dataclass
 from typing import List, Optional
 
-from .gcodes import GCode, LinearMove, UseAbsoluteCoordinates, UseRelativeCoordinates
+from .motion.gcodes import GCode, LinearMove, UseAbsoluteCoordinates, UseRelativeCoordinates
 from .custommap import MapConfig, to_coordinates, Node
 from .motion import MotionCommand
 
