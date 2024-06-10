@@ -7,6 +7,9 @@
 
 from abc import ABCMeta, abstractmethod
 from enum import Enum
+from typing import Optional
+
+from .constants import Point
 
 
 class GCode(metaclass=ABCMeta):
@@ -17,8 +20,22 @@ class GCode(metaclass=ABCMeta):
         Render the GCode as a string that can be sent to the Klipper socket.
         """
 
+    @abstractmethod
+    def end_coordinates(self) -> Optional[Point]:
+        """
+        Where will this gcode end, assuming absolute coordinates? 
+        
+        Note that absolute coordinates is considered the default, and consumers of 
+        this function should bear in mind that individual gcodes won't know whether
+        the machine is in absolute or relative modes, and should maintain their
+        own state or whatever to figure that out if the need to!
+        """
+
 
 class Rotation(Enum):
+    """
+    Enum for use in Arcs mostly
+    """
     Clockwise = "cw"
     CounterClockwise = "ccw"
 
@@ -28,12 +45,16 @@ class UseAbsoluteCoordinates(GCode):
     def to_str(self) -> str:
         return "G90"
 
+    def end_coordinates(self) -> Optional[Point]:
+        return None  # won't change coordinates
 
 class UseRelativeCoordinates(GCode):
 
     def to_str(self) -> str:
         return "G91"
     
+    def end_coordinates(self) -> Optional[Point]:
+        return None
 
 class SetAccelerationLimit(GCode):
 
@@ -48,6 +69,9 @@ class SetAccelerationLimit(GCode):
         See: https://marlinfw.org/docs/gcode/M204.html
         """
         return f"M204 T{self.limit_mm_s2}"
+
+    def end_coordinates(self) -> Optional[Point]:
+        return None
 
 class LinearMove(GCode):
 
@@ -65,6 +89,9 @@ class LinearMove(GCode):
         """
         return f"G1 X{self.x_mm} Y{self.y_mm} F{self.speed_mm_s * 60}"  # note that F is feedrate per minute (!)
     
+    def end_coordinates(self) -> Optional[Point]:
+        return Point(self.x_mm, self.y_mm)
+
 class ArcMove(GCode):
 
     def __init__(self, x_mm: float, y_mm: float, i_mm: float, j_mm: float, clockwise: bool, speed_mm_s: float) -> None:
@@ -91,3 +118,6 @@ class ArcMove(GCode):
         cmd = "G2" if self.clockwise else "G3"
         return f"{cmd} X{self.x_mm} Y{self.y_mm} I{self.i_mm} J{self.j_mm} F{self.speed_mm_s * 60}"  # note that F is feedrate per minute (!)
  
+    def end_coordinates(self) -> Optional[Point]:
+        return Point(self.x_mm, self.y_mm)
+    
