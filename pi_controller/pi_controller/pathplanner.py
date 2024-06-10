@@ -18,11 +18,33 @@ class PathFinder:
         self.grid = load_from_file(map_file)
         self.map_width, self.map_height = self.grid.shape
 
-    def redraw_path(self, start: Node, cat_location: Node) -> Optional[Path]:
+    def redraw_path(self, start: Node, cat_location: Node) -> Path:
+        retries = 100
+        path = None
         self.grid = add_obstacle(self.grid, cat_location, 2, 2)
-        goal = self._get_random_passable_node()
-        # print(goal)
-        return self.go_to_coords(start, goal)
+        for i in range(retries):
+            goal = self._get_random_passable_node()
+            path = self.go_to_coords(start, goal)
+            if path: return path
+        print("ERROR: Unable to generate a new path after 100 retries")
+
+    def redraw_path_if_necessary(
+        self, 
+        start: Node, 
+        cat_location: Node, 
+        path: List[Node], 
+        cat_closeness_threshhold: Optional[int],
+        check_upcoming_nodes: Optional[int],
+        minimum_path_len: Optional[int]
+    ) -> Path:
+        if len(path) < minimum_path_len:
+            return self.redraw_path(start, cat_location)
+        for node in path[:check_upcoming_nodes]:
+            dx_too_small = abs(node[0] - cat_location[0]) <= cat_closeness_threshhold
+            dy_too_small = abs(node[1] - cat_location[1]) <= cat_closeness_threshhold
+            cat_is_close = dx_too_small or dy_too_small 
+            if cat_is_close:
+                return self.redraw_path(start, cat_location)
 
     def go_to_coords(self, start: Node, goal: Node) -> Optional[Path]:
         return self._a_star(start, goal)
