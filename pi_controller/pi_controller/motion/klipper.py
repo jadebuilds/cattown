@@ -6,37 +6,16 @@
 # Author: Jade
 
 
-from abc import ABCMeta, abstractmethod
+
 from typing import Union
 import sys, socket, select, errno, time, json, math
 import threading
 from queue import Queue
 
-from .constants import Point
-from .motion import MotionCommand, DirectMove
-from .gcodes import GCode, UseAbsoluteCoordinates
-
-
-class MotionDriver(metaclass=ABCMeta):
-
-    @abstractmethod
-    def get_current_position(self) -> Point:
-        """
-        Get the current location.
-        """
-
-    @abstractmethod    
-    def enqueue_motion(self, motion: MotionCommand):
-        """
-        Add motion to the queue.
-        """
-
-    @abstractmethod
-    def clear_queue(self):
-        """
-        Make a best effort to sweep the queue of upcoming moves. This will be 
-        """
-
+from ..constants import Point
+from ..motion import MotionCommand, DirectMove
+from ..gcodes import GCode, UseAbsoluteCoordinates
+from .driver import MotionDriver
 
 class MockMotionDriver(MotionDriver):
 
@@ -67,9 +46,19 @@ class MockMotionDriver(MotionDriver):
             self.motion_queue.put(motion)
 
     @abstractmethod
-    def clear_queue(self):
+    def clear_queue(self) -> Point:
         """
-        Make a best effort to sweep the queue of upcoming moves. This will be 
+        Make a best effort to sweep the queue of upcoming moves.
+
+        Return the location that the mouse will be in when it's done executing
+        any irreversible moves -- ie that've been submitted to the Klipper socket
+        (since Klipper doesn't seem to feature rollback).
+        """
+    
+    @abstractmethod
+    def stop(self):
+        """
+        Shut down nicely / clean up / end threads / whatever
         """
 
 
@@ -203,7 +192,7 @@ class KlipperSocket(MotionDriver):
         self.should_close.set()
 
 
-class MoonrakerAPI(MotionDriver):
+class MoonrakerSocket(MotionDriver):
 
     def __init__(self, hostname: str):
         """
@@ -211,3 +200,16 @@ class MoonrakerAPI(MotionDriver):
         sends it G-code through the .
         """
 
+    def enqueue_motion(self, motion: MotionCommand):
+        return super().enqueue_motion(motion)
+
+    def get_current_position(self) -> Point:
+        return super().get_current_position()
+    
+    def clear_queue(self):
+        return super().clear_queue()
+    
+    def stop(self):
+        return super().stop()
+
+    
