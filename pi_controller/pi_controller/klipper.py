@@ -1,7 +1,7 @@
-# printer.py
+# klipper.py
 # 
-# Websocket control over Klipper 3D printing software
-# in order to send gcodes to a control board running Klipper.
+# Socket-based control over Klipper 3D printing software in order to 
+# send gcodes and collect status from a control board running Klipper.
 #
 # Author: Jade
 
