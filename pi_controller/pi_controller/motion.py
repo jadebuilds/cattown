@@ -23,11 +23,6 @@ class Direction(Enum):
     Down = "d"
 
 
-@dataclass
-class Point:  # A physical location on the board, measured in millimeters.
-    x_mm: float
-    y_mm: float
-
 # --------------------------------------------------------------------------- #
 # MOTION COMMANDS
 # --------------------------------------------------------------------------- #

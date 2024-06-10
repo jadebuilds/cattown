@@ -8,8 +8,7 @@
 import numpy as np
 from typing import Tuple
 
-from .constants import Node, Path, MapConfig, PASSABLE, INACCESSIBLE, IMPASSABLE, MOUSE_HOUSE_ENTRANCE
-from .motion import Point  # point in millimeters
+from .constants import Node, Path, Point, MapConfig, PASSABLE, INACCESSIBLE, IMPASSABLE, MOUSE_HOUSE_ENTRANCE
 
 def initialize_map(width_in: int, height_in: int) -> np.ndarray:
     # Create a 2D numpy array full of 0s
