@@ -21,3 +21,8 @@ MOUSE_HOUSE_ENTRANCE = 3
 # TODO syntactic sugar for element-wise add/subtract??
 Node = Tuple[int, int] 
 Path = List[Node]
+
+@dataclass
+class Point:  # A physical location on the board, measured in millimeters.
+    x_mm: float
+    y_mm: float

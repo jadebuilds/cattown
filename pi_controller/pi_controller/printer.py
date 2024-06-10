@@ -12,7 +12,8 @@ import sys, socket, select, errno, time, json, math
 import threading
 from queue import Queue
 
-from .motion import MotionCommand, Point, DirectMove
+from .constants import Point
+from .motion import MotionCommand, DirectMove
 from .gcodes import GCode, UseAbsoluteCoordinates
 
 
