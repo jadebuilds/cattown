@@ -12,8 +12,8 @@ from enum import Enum
 from typing import List, Tuple
 
 from .gcodes import GCode, UseAbsoluteCoordinates, UseRelativeCoordinates, LinearMove, ArcMove
-from .constants import Path, Node, MapConfig
-from .custommap import to_coordinates
+from ..constants import Path, Node, MapConfig
+from ..custommap import to_coordinates
 
 
 class Direction(Enum):
