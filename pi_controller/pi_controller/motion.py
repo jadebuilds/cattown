@@ -13,6 +13,8 @@ from typing import List, Tuple
 
 from .gcodes import GCode, UseAbsoluteCoordinates, UseRelativeCoordinates, LinearMove, ArcMove
 from .constants import Path, Node, MapConfig
+from .custommap import to_coordinates
+
 
 class Direction(Enum):
     Left = "l"
@@ -50,14 +52,16 @@ class MotionCommand(metaclass=ABCMeta):
 class DirectMove(MotionCommand):
     ""
     
-    def __init__(self, destination: Point, speed_mm_s: float):
+    def __init__(self, destination: Node, speed_mm_s: float, map_config: MapConfig):
         super().__init__()
         self.destination = destination
         self.speed_mm_s = speed_mm_s
+        self.map_config = map_config
 
     def to_g_code(self) -> List[GCode]:
+        dest_coords = to_coordinates(self.destination, self.map_config)
         return [
-            LinearMove(x_mm=self.destination.x_mm, y_mm=self.destination.y_mm, speed_mm_s=self.speed_mm_s)
+            LinearMove(x_mm=dest_coords.x_mm, y_mm=dest_coords.y_mm, speed_mm_s=self.speed_mm_s)
         ]
 
 
@@ -66,9 +70,12 @@ class RelativeMove(MotionCommand):
     For canned routines like exiting a mouse house or dropping off a toy back in a mouse house.
     """
 
-    def __init__(self, direction: Direction, distance_mm: float, speed_mm_s: float) -> None:
+    def __init__(self, direction: Direction, steps: int, speed_mm_s: float, map_config: MapConfig) -> None:
+        """
+        Move a certain number of 
+        """
         super().__init__()
-        self.distance_mm = distance_mm
+        self.distance_mm = map_config.map_grid_spacing_mm * steps
         self.direction = direction
         self.speed_mm_s = speed_mm_s
 
