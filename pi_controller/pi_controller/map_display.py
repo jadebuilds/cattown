@@ -117,7 +117,7 @@ class Game:
             cat_location=self.cat_location, 
             path=self.path, 
             cat_closeness_threshhold=1, 
-            check_upcoming_nodes=4,
+            check_upcoming_tiles=4,
             minimum_path_len=self.minimum_path_len
         )
         if new_path:

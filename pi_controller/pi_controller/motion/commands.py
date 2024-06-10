@@ -12,7 +12,7 @@ from enum import Enum
 from typing import List, Tuple
 
 from .gcodes import GCode, UseAbsoluteCoordinates, UseRelativeCoordinates, LinearMove, ArcMove
-from ..constants import Path, Node, MapConfig
+from ..constants import Path, Tile, MapConfig
 from ..custommap import to_coordinates
 
 
@@ -47,7 +47,7 @@ class MotionCommand(metaclass=ABCMeta):
 class DirectMove(MotionCommand):
     ""
     
-    def __init__(self, destination: Node, speed_mm_s: float, map_config: MapConfig):
+    def __init__(self, destination: Tile, speed_mm_s: float, map_config: MapConfig):
         super().__init__()
         self.destination = destination
         self.speed_mm_s = speed_mm_s
@@ -136,7 +136,7 @@ class SimpleSquigglePath(MotionCommand):
         and goes to an adjacent neighbor (up, down, left, right).
         """
         super().__init__()
-        self.map_path = map_path  # List[Node]
+        self.map_path = map_path
         self.map_config = map_config
         self.speed_mm_s = speed_mm_s
 
@@ -233,7 +233,7 @@ class SimpleSquigglePath(MotionCommand):
         return gcodes
 
     @staticmethod
-    def _segment_direction(start: Node, end: Node) -> MapVector:
+    def _segment_direction(start: Tile, end: Tile) -> MapVector:
         dir = (end[0] - start[0], end[1] - start[1])
         assert abs(dir[0] + dir[1]) == 1, "I only know how to handle 1-length steps (up, left, right, or down)! Sorry!"
         return dir
@@ -264,7 +264,7 @@ class SimpleSquigglePath(MotionCommand):
 
         return i,j
 
-    def _full_arc(self, start: Node, end: Node, clockwise: bool) -> ArcMove:
+    def _full_arc(self, start: Tile, end: Tile, clockwise: bool) -> ArcMove:
         dir_vec = self._segment_direction(start, end)
 
         i, j = self._arc_center_offsets(direction=dir_vec, clockwise=clockwise)
@@ -278,7 +278,7 @@ class SimpleSquigglePath(MotionCommand):
             speed_mm_s=self.speed_mm_s
         )
     
-    def _two_half_arcs(self, start: Node, end: Node, first_arc_clockwise: bool) -> Tuple[ArcMove, ArcMove]:
+    def _two_half_arcs(self, start: Tile, end: Tile, first_arc_clockwise: bool) -> Tuple[ArcMove, ArcMove]:
         """
         Construct a segment which is two half-sized arcs. This segment starts and end with the same curl --
         if the last arc was clockwise, we'll do a small counterclockwise arc and then another clockwise

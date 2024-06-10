@@ -9,6 +9,7 @@ import websockets
 import json
 import threading
 import time
+import copy
 
 import websockets.sync
 import websockets.sync.client
@@ -78,10 +79,12 @@ class MoonrakerSocket(MotionDriver):
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~ MotionDriver API ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def enqueue_motion(self, motion: MotionCommand):
-        return super().enqueue_motion(motion)
+        with self._state_lock:
+            self._gcodes_queued.extend(motion.to_g_code())
 
     def get_current_position(self) -> Point:
-        return super().get_current_position()
+        with self._state_lock:
+            return copy.copy(self._current_location)  # TODO do I actually need to do this copy?
     
     def clear_queue(self):
         return super().clear_queue()
