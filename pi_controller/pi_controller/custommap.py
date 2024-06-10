@@ -79,3 +79,17 @@ def to_coordinates(node: Node, map_config: MapConfig) -> Point:
         coords.y_mm = 0
 
     return coords
+
+def to_node(point: Point, map_config: MapConfig) -> Node:
+    """
+    Convert coordinates back to the nearest node / grid tile. 
+    """
+
+    node = Node(
+        (point.x_mm - map_config.map_x_offset) / map_config.map_grid_spacing_mm,
+        (point.y_mm - map_config.map_y_offset) / map_config.map_grid_spacing_mm
+    )
+    
+    assert 0 <= node[0] <= map_config.grid_size_x, f"X={node[0]} (from point {point}) is not in bounds!"
+    assert 0 <= node[1] <= map_config.grid_size_y, f"Y={node[1]} (from point {point}) is not in bounds!"
+
