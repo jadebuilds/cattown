@@ -64,8 +64,18 @@ def to_coordinates(node: Node, map_config: MapConfig) -> Point:
 
     Not hard, just figured I'd wrap it so we don't have to do it over and over again!
     """
-
-    return Point(
+    coords = Point(
         x_mm=node[0] * map_config.map_grid_spacing_mm + map_config.map_x_offset,
         y_mm=node[1] * map_config.map_grid_spacing_mm + map_config.map_y_offset,
     )
+
+    # Floor negative coordinates. This is a cheesy little workaround for the Open
+    # Sauce prototype, the bottom-most addressable row of map nodes are juuuuuust under
+    # 0 mm for the motion system and so I'm going to make them traversable anyway
+    # and just trim up 3 mm. Shouldn't be noticeable to the user, keeps that addressable!
+    if coords.x_mm < 0:
+        coords.x_mm = 0
+    if coords.y_mm < 0:
+        coords.y_mm = 0
+
+    return coords
