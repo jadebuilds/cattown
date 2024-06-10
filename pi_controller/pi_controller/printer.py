@@ -117,7 +117,11 @@ class KlipperSocket(MotionDriver):
         # Default to absolute coordinates
         self.enqueue_motion(UseAbsoluteCoordinates())
 
-        # TODO use objects/subscribe to figure out what's up
+        # Subscribe to toolhead position
+        # er, let's start out by seeing what objecst there are -- TODO remove me
+        self._send_command({
+                "method": "objects/list", 
+            })
 
     def get_current_position(self) -> Point:
         raise NotImplementedError  # todo how do I do this???? maybe using objects/subscribe?
