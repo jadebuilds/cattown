@@ -8,7 +8,7 @@
 import numpy as np
 from typing import Tuple
 
-from .constants import Node, Path, Point, MapConfig, PASSABLE, INACCESSIBLE, IMPASSABLE, MOUSE_HOUSE_ENTRANCE
+from .constants import Tile, Path, Point, MapConfig, PASSABLE, INACCESSIBLE, IMPASSABLE, MOUSE_HOUSE_ENTRANCE
 
 def initialize_map(width_in: int, height_in: int) -> np.ndarray:
     # Create a 2D numpy array full of 0s
@@ -50,27 +50,32 @@ def load_from_file(csv_filepath: str) -> np.ndarray:
     return np.nan_to_num(map)
 
 
-def node_is_passable(node_value: int) -> bool:
+def tile_is_passable(tile_value: int) -> bool:
     return (
-        (node_value != INACCESSIBLE) and
-        (node_value != IMPASSABLE)
+        (tile_value != INACCESSIBLE) and
+        (tile_value != IMPASSABLE)
     )
 
-def to_coordinates(node: Node, map_config: MapConfig) -> Point:
+def to_coordinates(tile: Tile, map_config: MapConfig) -> Point:
     """
-    Convert a grid node on the map (X, Y as integer coordinates) to a physical
+    Convert a grid tile on the map (X, Y as integer coordinates) to a physical
     position on the board (X, Y in millimeters) using what we know about the size 
     and position of the map grid.
+
+    This should be understood to yield the geometric center of the tile. For the 
+    V5 Open Sauce prototype, tiles are placed so that they either have a slot directly
+    in the center, or the center of the tile is exactly between two slots (this is 
+    individually true in both X and Y).
 
     Not hard, just figured I'd wrap it so we don't have to do it over and over again!
     """
     coords = Point(
-        x_mm=node[0] * map_config.map_grid_spacing_mm + map_config.map_x_offset,
-        y_mm=node[1] * map_config.map_grid_spacing_mm + map_config.map_y_offset,
+        x_mm=tile[0] * map_config.map_grid_spacing_mm + map_config.map_x_offset,
+        y_mm=tile[1] * map_config.map_grid_spacing_mm + map_config.map_y_offset,
     )
 
     # Floor negative coordinates. This is a cheesy little workaround for the Open
-    # Sauce prototype, the bottom-most addressable row of map nodes are juuuuuust under
+    # Sauce prototype, the bottom-most addressable row of map tiles are juuuuuust under
     # 0 mm for the motion system and so I'm going to make them traversable anyway
     # and just trim up 3 mm. Shouldn't be noticeable to the user, keeps that addressable!
     if coords.x_mm < 0:
@@ -80,16 +85,16 @@ def to_coordinates(node: Node, map_config: MapConfig) -> Point:
 
     return coords
 
-def to_node(point: Point, map_config: MapConfig) -> Node:
+def to_tile(point: Point, map_config: MapConfig) -> Tile:
     """
-    Convert coordinates back to the nearest node / grid tile. 
+    Convert coordinates back to the nearest grid tile. 
     """
 
-    node = Node(
+    tile = Tile(
         (point.x_mm - map_config.map_x_offset) / map_config.map_grid_spacing_mm,
         (point.y_mm - map_config.map_y_offset) / map_config.map_grid_spacing_mm
     )
     
-    assert 0 <= node[0] <= map_config.grid_size_x, f"X={node[0]} (from point {point}) is not in bounds!"
-    assert 0 <= node[1] <= map_config.grid_size_y, f"Y={node[1]} (from point {point}) is not in bounds!"
+    assert 0 <= tile[0] <= map_config.grid_size_x, f"X={tile[0]} (from point {point}) is not in bounds!"
+    assert 0 <= tile[1] <= map_config.grid_size_y, f"Y={tile[1]} (from point {point}) is not in bounds!"
 

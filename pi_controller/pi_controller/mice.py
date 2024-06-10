@@ -8,14 +8,14 @@ from dataclasses import dataclass
 from typing import List, Optional
 
 from .motion.gcodes import GCode, LinearMove, UseAbsoluteCoordinates, UseRelativeCoordinates
-from .custommap import MapConfig, to_coordinates, Node
+from .custommap import MapConfig, to_coordinates, Tile
 from .motion import MotionCommand
 
 class MouseHouse:
     """
     """
     def __init__(self,
-                 map_coords: Node,  # (X, Y) position of the mouse house entrance, in map coordinates (position on the 50 mm grid)
+                 map_coords: Tile,  # (X, Y) position of the mouse house entrance, in map coordinates (position on the 50 mm grid)
                  occupied: Optional[bool] = None,
                  ) -> None:
         

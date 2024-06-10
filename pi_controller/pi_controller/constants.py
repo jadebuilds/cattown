@@ -27,8 +27,8 @@ MOUSE_HOUSE_ENTRANCE = 3
 
 # type wrapper for positions on the grid. 
 # TODO syntactic sugar for element-wise add/subtract??
-Node = Tuple[int, int] 
-Path = List[Node]
+Tile = Tuple[int, int] 
+Path = List[Tile]
 
 @dataclass
 class Point:  # A physical location on the board, measured in millimeters.
