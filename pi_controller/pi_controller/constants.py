@@ -8,7 +8,7 @@ class MapConfig:
     map_y_offset: float  # ""
 
 
-OPEN_SAUCE_MAP_CONFIG = MapConfig(50.0, 0.0, 0.0)  # using a 50 mm spacing
+OPEN_SAUCE_MAP_CONFIG = MapConfig(50.0, -137.0, -53.0)  # using a 50 mm spacing
 
 
 # Map values (not using an Enum for the moment because they're so clunky in Python)

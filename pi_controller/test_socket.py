@@ -22,7 +22,8 @@ map_config=MapConfig(50., 62., 47.)
 
 panel_2_house = MouseHouse((19, 5), occupied=False)
 
-k.enqueue_motion(DropOffMouse(panel_2_house, map_config))
+k.enqueue_motion(DirectMove((19, 5)))
+#k.enqueue_motion(DropOffMouse(panel_2_house, map_config))
 
 
 time.sleep(10)
