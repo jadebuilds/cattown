@@ -9,7 +9,7 @@ from abc import ABCMeta, abstractmethod
 from enum import Enum
 from typing import Optional
 
-from .constants import Point
+from ..constants import Point
 
 
 class GCode(metaclass=ABCMeta):
