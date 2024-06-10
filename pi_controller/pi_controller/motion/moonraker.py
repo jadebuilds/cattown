@@ -1,14 +1,21 @@
+# moonraker.py
+# 
+# Connects to the Moonraker API using JSON-RPC and websockets.
+# 
+# Author: Jade
+
+from typing import Optional
+import websockets
+import json
+import threading
+import time
+
 import websockets.sync
 import websockets.sync.client
 from .driver import MotionDriver
 from .commands import MotionCommand
 from .utils import ThreadSafeMonotonicCounter
 from ..constants import Point
-
-import websockets
-import json
-import threading
-import time
 
 
 PRIMARY_WEBSOCKET_URL = "ws://{hostname}/websocket"
@@ -58,6 +65,16 @@ class MoonrakerSocket(MotionDriver):
              }
         })
 
+        # ~~~~ STATE ~~~~ #
+        # All of these should be protected by self.state_lock, thanks!
+        self._state_lock = threading.Lock()
+        self._last_update_timestamp: float = 0  # as a Klipper eventtime (TODO what are they?)
+        self._current_location: Optional[Point] = None  # Last reported location
+        self._gcodes_queued = []  # Moves that are queued up and will be submitted to Klipper
+                                  # as soon as it gets hungry for more gcodes (yum)
+        self._gcodes_submitted = []  # Moves that have been submitted to Klipper and can never
+                                     # be revoked, so help us God, but don't appear to be done yet
+
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~ MotionDriver API ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def enqueue_motion(self, motion: MotionCommand):
@@ -95,9 +112,36 @@ class MoonrakerSocket(MotionDriver):
                 continue
 
             data = json.loads(message)
-            if "motion_report" in message:
-                print(data)  # TODO for initial investigation, remove me
+        
+            try:
+                # Our very first message is an objects.subscribe, which thoughtfully responds with
+                # a readout of the motion_report object (similar to an objects/query maybe?)
+                # that we can use:
+                if data.get('id', None) == 0:  # notify_status_update messages don't have an ID so we'll get() with a default
+                    eventtime = data['result']['eventtime']
+                    pos_4d = data['result']['status']['motion_report']['live_position']   # X, Y, Z, E I'm pretty sure
+                    with self._state_lock:
+                        self._current_location = Point(pos_4d[0], pos_4d[1])
+                        self._last_update_timestamp = eventtime
+                    print(f"Got initial location! {self._current_location}")
 
+                # After that we'll get a stream of differently formatted notify_status_update
+                # messages which have the thing we need!
+                elif data['method'] == 'notify_status_update':
+                    print("got notify_status_update")
+                    eventtime = data['params'][1]  # pretty sure! why is it not labeled? idk
+                    print(f"  > eventtime: {eventtime}")
+                    pos_4d = data['params'][0]['motion_report']['live_position']
+                    print(f"  > pos4d: {pos_4d}")
+                    # TODO how do I flow-control this to not repeat this code?
+                    with self._state_lock:
+                        self._current_location = Point(pos_4d[0], pos_4d[1])
+                        self._last_update_timestamp = eventtime
+                    print(f"Got updated location! {self._current_location}")
+
+            except KeyError:
+                print(f"No motion_report to see here: {message}")
+                pass  # TODO set up logging so we can trace-level log here
 
 if __name__ == "__main__":
     moonraker = MoonrakerSocket("cattown001.local")
