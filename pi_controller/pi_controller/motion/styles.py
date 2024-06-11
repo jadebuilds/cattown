@@ -3,7 +3,7 @@ from typing import List
 
 from ..constants import Tile
 from .gcodes import GCode, LinearMove
-from ..custommap import to_coordinates
+from ..custommap import MapConfig, to_coordinates
 
 
 
@@ -33,12 +33,13 @@ class SimpleArcSquiggles(MotionStyle):
 
 class SimpleStraightLines(MotionStyle):
 
-    def __init__(self, speed_mm_s: float):
+    def __init__(self, speed_mm_s: float, map_config: MapConfig):
         self.speed_mm_s = speed_mm_s
+        self.map_config = map_config
 
-    def generate_motion(self, path_segment: List[Tile[int]]) -> List[GCode]:
+    def generate_motion(self, path_segment: List[Tile]) -> List[GCode]:
         return [
-            LinearMove.from_point(to_coordinates(tile), speed_mm_s=self.speed_mm_s)
+            LinearMove.from_point(to_coordinates(tile, self.map_config), speed_mm_s=self.speed_mm_s)
             for tile in path_segment
         ]
 
@@ -48,9 +49,9 @@ class ZigZag(MotionStyle):
     def __init__(self, speed_mm_s: float):
         self.speed_mm_s = speed_mm_s
     
-    def generate_motion(self, path_segment: List[Tile[int]]) -> List[GCode]:
+    def generate_motion(self, path_segment: List[Tile]) -> List[GCode]:
         """
-        Another TODO: Redo Squiggles but as .
+        Another TODO: Redo Squiggles but as a sawtooth.
         Yet another TODO: How do we do lookahead????? This is actually pretty important for cornering.
         I will probably just do it without lookahead to start...
         """

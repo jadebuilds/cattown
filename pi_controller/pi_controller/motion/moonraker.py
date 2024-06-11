@@ -15,8 +15,7 @@ import logging
 import websockets.sync
 import websockets.sync.client
 
-from pi_controller.pi_controller.motion.driver import PositionUpdateCallback
-from .driver import MotionDriver
+from .driver import MotionDriver, PositionUpdateCallback
 from .commands import MotionCommand
 from .utils import ThreadSafeMonotonicCounter
 from ..constants import Point
@@ -88,8 +87,8 @@ class MoonrakerSocket(MotionDriver):
             gcodes = motion  # should be List[GCode] (but there's no way to check that in runtime because Python's type system is hot garbage)
 
         for gcode in gcodes:
-            self._send_command({
-                "method": "gcode/script", 
+            self._send({
+                "method": "printer.gcode.script", 
                 # TODO should we submit multiple g-codes in a single script? what's the delimiter?
                 # (jade to dig into the Klipper source)
                 "params": {"script": gcode.to_str()}
@@ -116,7 +115,7 @@ class MoonrakerSocket(MotionDriver):
 
     def subscribe_to_position(self, position_callback: PositionUpdateCallback) -> None:
         with self._state_lock:
-            self.self._position_callbacks.append(position_callback)
+            self._position_callbacks.append(position_callback)
 
     def stop(self):
         self.ws.close()
