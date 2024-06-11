@@ -9,21 +9,34 @@ from dataclasses import dataclass
 import threading
 import copy
 from .constants import Tile
+import logging
+
+
+logger = logging.Logger(__name__)
 
 
 class Path:
     """
-    A representation of the path for the mouse to follow.
+    A representation of the path for the mouse to follow. Kind of a custom 
+    queue data structure, where the PathPlanner is adding tiles on the end / 
+    redoing the path toward the end while PathFollower chews tiles off the front
+    (tracking the progress of the physical mouse). Thread-safe (thorough
+    lock use, not at all optimized) and should be conflict-free.
 
-    TODO what happens when we switch mice? Do we instantiate a new path 
-    or update the old one? I'm assuming we'll have one fixed Path which is
-    kind of the "path for the toolhead" rather than the path for any individual
-    mouse, and it will just happen to include stops to pick up and drop off
-    mice along the way. I think that's simpler than trying to maintain separate
-    state per mouse and swap back and forth. But let's discuss 🙏
+    Supports partial rollback with a construct of "commitment"; when we send G-Code
+    to Klipper we can't undo it, so we submit motion one tile at a time and mark
+    tiles that have had G-Code submitted for them as "committed" / not-rollback-able.
+
+    There should only be one Path object, which describes the path of the toolhead itself.
+    (We don't want to crash into mounting tabs, which are mostly flush for Open Sauce but
+    some of them aren't quite; so we'll use path-planning to navigate the board even when 
+    we don't have a toy attached, because it avoids obstacles and thus avoids mounting 
+    tabs too.)
 
     This class serves as an interface between path planning and hardware, and
     so it takes on responsibility for thread safety.
+
+    TODO support interjecting PickUpMouse / DropOffMouse actions into the path somehow
     """
 
     def __init__(self,
@@ -91,8 +104,12 @@ class Path:
 
     def subscribe_to_extend(self, callback: Callable):
         """
-        Install a callback with no arguments, so that a PathFollower that's bottomed out
-        can know when to start moving again.
+        PathFollower needs to know when the Path gets extended; this way it can
+        "bottom out" at the end of a Path that hasn't gotten updated, stop, then resume
+        when the Path is extended. (See PathFollower._path_extended() !)
+
+        This method lets PathFollower install a callback that gets called when extend()
+        is invoked. Callbacks have no arguments, it's assumed that 
         """
         with self._lock:
             if callback not in self._extend_callbacks:
@@ -100,14 +117,18 @@ class Path:
 
     # --------------------------- Interface for PathPlanner --------------------------- #        
 
-    def extend(self, new_segment: 'Path'):            
+    def extend(self, new_segment: List[Tile]):
         """
         Extend with another path segment.
         """
+
         with self._lock:
-            self._tiles.extend(new_segment._tiles)
-            for callback in self._extend_callbacks:
-                callback()  # again, used by PathFollower to know that it's time to resume
+            self._tiles.extend(new_segment)
+
+        for callback in self._extend_callbacks:
+            callback()  # again, used by PathFollower to know that it's time to resume
+        
+        logger.info("Path extended: {self}")
 
     def clear(self) -> Tile:
         """
@@ -145,9 +166,11 @@ class Path:
                     )
                 else:
                     truncate_end_index = self._tiles.index(end_tile)
-                    
+                
+                n_truncated = len(self._tiles) - truncate_end_index - 1
                 self._tiles = self._tiles[:truncate_end_index + 1]  # keep the end_tile in the list
                 
+                logger.info(f"Path truncated by {n_truncated}: {self}")
                 return self._tiles[-1]
     
     # --------------------------- Utility functions for anyone --------------------------- #
@@ -160,6 +183,7 @@ class Path:
         / around the lock and mutate the internal list.
         """
         with self._lock:
+            logger.debug("get_tiles(): shallow-copying tiles")  # make sure we don't accidentally do this too much
             return copy.copy(self._tiles)  # shallow-copy so that we don't accidentally list mumble mutate
 
     def __len__(self):
@@ -219,4 +243,4 @@ class Path:
         # That exposes us to edge cases in which self._tiles gets mutated while
         # we're translating it to str, in which case............ idk! We'll
         # figure it out!
-        return f"Path: {self._tiles}"
+        return f"Path: {len(self._tiles)} tiles, {self[0]} --> {self[-1]}"
