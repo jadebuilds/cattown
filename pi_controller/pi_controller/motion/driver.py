@@ -4,11 +4,12 @@
 # 
 # Author: Jade
 
-from typing import Any, Protocol
+from typing import Union, List, Protocol
 from abc import ABCMeta, abstractmethod
 
 from ..constants import Point
 from .commands import MotionCommand
+from .gcodes import GCode
 
 
 class PositionUpdateCallback(Protocol):
@@ -34,7 +35,7 @@ class MotionDriver(metaclass=ABCMeta):
         """
 
     @abstractmethod    
-    def enqueue_motion(self, motion: MotionCommand):
+    def enqueue_motion(self, motion: Union[GCode, MotionCommand, List[GCode]]):
         """
         Add motion to the queue. This is considered irreversible -- once motion is
         enqueued we don't expect to take it back. If you want to queue up motion and
