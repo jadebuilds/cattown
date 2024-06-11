@@ -2,9 +2,9 @@ from typing import Optional, List
 import threading
 
 from ..constants import Point, Tile
-from ..path import Path, PathSegment
+from ..path import Path
 from .driver import MotionDriver
-from ..custommap import to_tile
+from ..custommap import MapConfig, to_tile
 from .styles import MotionStyle
 
 class PathFollower:
@@ -12,10 +12,12 @@ class PathFollower:
     def __init__(self,
                  motion_driver: MotionDriver,
                  starting_motion_style: MotionStyle,
+                 map_config: MapConfig,
                  path: Optional[Path] = None,
                  ):
         self.motion_driver = motion_driver
         self.motion_driver.subscribe_to_position(self._update_position)
+        self.map_config = map_config
 
         self.path: Optional[Path] = None
         if path:
@@ -27,6 +29,12 @@ class PathFollower:
 
         self.paused = threading.Event()
 
+
+    def get_current_tile(self) -> Tile:
+        """
+        Ask the MotionDriver where the mouse is currently.
+        """
+        return to_tile(self.motion_driver.get_current_position(), self.map_config)
 
     def follow_path(self, path: Path):
         """
@@ -64,7 +72,7 @@ class PathFollower:
         the next tile down.
         """
         if self.path:
-            current_tile = to_tile(current_position)
+            current_tile = to_tile(current_position, map_config=self.map_config)
             
             if current_tile != self.last_tile:
                 self.path.advance(current_tile)
@@ -112,7 +120,7 @@ class PathFollower:
             # we really can't get into this state without having advanced down a Path already,
             # which means that self.path.last_committed() will have a value, and since we 
             # were extended already that means there are definitely fresh tiles to visit
-            assert self.path.first_uncommitted() == self.path[0], f"Expected to be paused at the first tile in the path, instead we're paused at {self.path.first_uncommitted()} on path {self.path}???"
+            assert self.path.last_committed() == self.path[0], f"Expected to be paused at the first tile in the path, instead we're paused at {self.path.last_committed()} on path {self.path}???"
             self._enqueue_motion(self.path[:3])  # three tiles again to have some buffer
 
             self.paused.clear()  # Engine is going, alle ist gut
