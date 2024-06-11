@@ -100,10 +100,10 @@ class MoonrakerSocket(MotionDriver):
         """
         if not self._current_location:
             # If we haven't heard a location yet, wait up to two seconds
-            logger.info("We haven't ")
+            logger.info("Waiting for Moonraker to give us a starting position...")
             t_now = time.monotonic()
             t_timeout = t_now + 2.0
-            while time.monotonic < t_timeout:
+            while time.monotonic() < t_timeout:
                 if (self._current_location):
                     break
                 time.sleep(0.1)
@@ -167,9 +167,9 @@ class MoonrakerSocket(MotionDriver):
                     # TODO how do I flow-control this to not repeat this code?
                 
                 if new_location:
-                    print(f"Got location! {self._current_location}")
                     with self._state_lock:
-                        self._current_location = Point(pos_4d[0], pos_4d[1])
+                        self._current_location = new_location
+                        print(f"Got location! {self._current_location}")
                         self._last_update_timestamp = eventtime
                         for callback in self._position_callbacks:
                             callback(new_location)
