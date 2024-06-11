@@ -3,7 +3,7 @@ from typing import Tuple, List
 
 @dataclass
 class MapConfig:
-    map_grid_spacing_mm: float  # For conversion between map locations (Nodes, int) and physical locations (Points, float)
+    map_grid_spacing_mm: float  # For conversion between map locations (Tiles, int) and physical locations (Points, float)
     map_x_offset: float  # For calibration against the physical frame -- because 0, 0 for the drive system
     map_y_offset: float  #     is inset from the left bottom of the board by the frame and mounting brackets.
     grid_size_x: int  # Size of the map. Assumed to fit within the board -- note that we don't currently
@@ -27,6 +27,7 @@ MOUSE_HOUSE_ENTRANCE = 3
 
 # type wrapper for positions on the grid. 
 # TODO syntactic sugar for element-wise add/subtract??
+# Note that equality comparison already works
 Tile = Tuple[int, int] 
 Path = List[Tile]
 
