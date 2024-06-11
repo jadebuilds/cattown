@@ -75,6 +75,10 @@ class SetAccelerationLimit(GCode):
 
 class LinearMove(GCode):
 
+    @classmethod
+    def from_point(cls, point: Point, speed_mm_s: float):
+        return LinearMove(x_mm = point.x_mm, y_mm=point.y_mm, speed_mm_s=speed_mm_s)
+
     def __init__(self, x_mm: float, y_mm: float, speed_mm_s: float) -> None:
         self.x_mm = x_mm
         self.y_mm = y_mm

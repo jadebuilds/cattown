@@ -4,7 +4,8 @@
 # This serves as a central hinge point for translating mapping
 # into physical motion and back.
 
-from typing import List, Union, Optional
+from typing import List, Union, Optional, Callable
+from dataclasses import dataclass
 import threading
 import copy
 from .constants import Tile
@@ -35,6 +36,9 @@ class Path:
         self._tiles = tiles or []  # n.b. you can't say `tiles: Optional... = []` or else Weird Shit Happens
         # Segment of the Path that we've submitted to Klipper already (see commit_...() below)
         self._committed_destination: Optional[Tile] = None  
+        self._extend_callbacks = []
+
+    # --------------------------- Interface for MotionDriver --------------------------- #
 
     def advance(self, current_tile: Tile):
         """
@@ -69,16 +73,32 @@ class Path:
 
     def commit_to_movement(self, target_tile: Tile):
         """
-        Call me when we submit motion to Klipper to limits the amount that other
+        Called when we submit motion to Klipper to limits the amount that other
         clients can truncate off the path.
         
-        Raises IndexError if target_tile
+        Raises IndexError if target_tile is not on the Path.
+
+        Note that in practice the committed destination should never "go stale" and fall
+        off the front end of the path; self_committed_destination should always be contained
+        in self._tiles, because in order to actually move the toolhead to a different tile
+        we would have to commit to moving there first. So we can assume that 
+        self._committed_destination remains valid.
         """
         with self._lock:
             if not target_tile in self._tiles:
                 raise IndexError(f"Tile {target_tile} is not in path {self}!")
             self._committed_destination = target_tile
-        
+
+    def subscribe_to_extend(self, callback: Callable):
+        """
+        Install a callback with no arguments, so that a PathFollower that's bottomed out
+        can know when to start moving again.
+        """
+        with self._lock:
+            if callback not in self._extend_callbacks:
+                self._extend_callbacks.append(callback)
+
+    # --------------------------- Interface for PathPlanner --------------------------- #        
 
     def extend(self, new_segment: 'Path'):            
         """
@@ -86,6 +106,8 @@ class Path:
         """
         with self._lock:
             self._tiles.extend(new_segment._tiles)
+            for callback in self._extend_callbacks:
+                callback()  # again, used by PathFollower to know that it's time to resume
 
     def clear(self) -> Tile:
         """
@@ -128,6 +150,8 @@ class Path:
                 
                 return self._tiles[-1]
     
+    # --------------------------- Utility functions for anyone --------------------------- #
+
     def get_tiles(self) -> List[Tile]:
         """
         Pull out the tiles contained within the Path object.
@@ -137,6 +161,34 @@ class Path:
         """
         with self._lock:
             return copy.copy(self._tiles)  # shallow-copy so that we don't accidentally list mumble mutate
+
+    def __len__(self):
+        with self._lock:  # TODO is this needed?
+            return len(self._tiles)
+
+    def last_committed(self) -> Optional[Tile]:
+        """
+        The last tile we committed to.
+        be
+        """
+        with self._lock:
+            return self._committed_destination
+
+    def first_uncommitted(self) -> Optional[Tile]:
+        """
+        The next tile past that one... if there is such a tile. If we've already
+        committed to the whole path, then this returns None.
+        """
+        with self._lock:
+            if self._committed_destination:
+                # Should never raise ValueError because we can't move away from the tile in
+                # self._committed_destination without committing to a further tile first
+                committed_index = self._tiles.index(self._committed_destination)
+                try:
+                    return self._tiles[committed_index + 1]
+                except IndexError:
+                    return None  # We've hit the end of the list
+
 
     def __getitem__(self, key: Union[int, slice]) -> Union[Tile, List[Tile]]:
         """
@@ -159,7 +211,7 @@ class Path:
         / around the lock and mutate the internal list.
         """
         with self._lock:
-            return copy.copy(self._tiles[key])
+                return self._tiles[key]
 
     def __str__(self) -> str:
         # I keep trying to print(self) during critical sections in which

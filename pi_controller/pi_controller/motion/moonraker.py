@@ -4,7 +4,7 @@
 # 
 # Author: Jade
 
-from typing import Optional, List
+from typing import Optional, List, Union
 import websockets
 import json
 import threading
@@ -79,13 +79,15 @@ class MoonrakerSocket(MotionDriver):
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~ MotionDriver API ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    def enqueue_motion(self, motion: MotionCommand):
+    def enqueue_motion(self, motion: Union[GCode, List[GCode], MotionCommand]):
         if isinstance(motion, MotionCommand):
             gcodes = motion.to_g_code()  # type: List[GCode]
         elif isinstance(motion, GCode):
             gcodes = [motion]  # because sometimes we want to enqueue like just a UseAbsoluteCoordinates
+        else:
+            gcodes = motion  # should be List[GCode] (but there's no way to check that in runtime because Python's type system is hot garbage)
 
-        for gcode in gcodes:  # todo figure out how to submit them all as scripts
+        for gcode in gcodes:
             self._send_command({
                 "method": "gcode/script", 
                 # TODO should we submit multiple g-codes in a single script? what's the delimiter?
