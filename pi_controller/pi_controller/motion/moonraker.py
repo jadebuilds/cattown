@@ -9,8 +9,9 @@ import websockets
 import json
 import threading
 import time
-import copy
-
+import websockets
+import threading
+import logging
 import websockets.sync
 import websockets.sync.client
 
@@ -26,8 +27,7 @@ PRIMARY_WEBSOCKET_URL = "ws://{hostname}/websocket"
 BRIDGE_WEBSOCKET_URL = "ws://{hostname}/klipper"  # just in case it's useful
 
 
-import websockets
-import threading
+logger = logging.getLogger(__name__)
 
 
 class MoonrakerSocket(MotionDriver):
@@ -96,8 +96,22 @@ class MoonrakerSocket(MotionDriver):
             })
 
     def get_current_position(self) -> Point:
-        with self._state_lock:
-            return copy.copy(self._current_location)  # TODO do I actually need to do this copy?
+        """
+        Get the current position from Moonraker
+        """
+        if not self._current_location:
+            # If we haven't heard a location yet, wait up to two seconds
+            logger.info("We haven't ")
+            t_now = time.monotonic()
+            t_timeout = t_now + 2.0
+            while time.monotonic < t_timeout:
+                if (self._current_location):
+                    break
+                time.sleep(0.1)
+
+            raise TimeoutError("Unable to get a position from Moonraker :(")
+
+        return self._current_location
     
 
     def subscribe_to_position(self, position_callback: PositionUpdateCallback) -> None:
