@@ -2,7 +2,7 @@ from typing import Optional, List
 import threading
 
 from ..constants import Point, Tile
-from ..path import Path
+from ..toolhead_trajectory import ToolheadTrajectory
 from .driver import MotionDriver
 from ..custommap import MapConfig, to_tile
 from .styles import MotionStyle
@@ -13,13 +13,13 @@ class PathFollower:
                  motion_driver: MotionDriver,
                  starting_motion_style: MotionStyle,
                  map_config: MapConfig,
-                 path: Optional[Path] = None,
+                 path: Optional[ToolheadTrajectory] = None,
                  ):
         self.motion_driver = motion_driver
         self.motion_driver.subscribe_to_position(self._update_position)
         self.map_config = map_config
 
-        self.path: Optional[Path] = None
+        self.path: Optional[ToolheadTrajectory] = None
         if path:
             self.follow_path(path)
 
@@ -36,7 +36,7 @@ class PathFollower:
         """
         return to_tile(self.motion_driver.get_current_position(), self.map_config)
 
-    def follow_path(self, path: Path):
+    def follow_path(self, path: ToolheadTrajectory):
         """
         Start following the attached Path. PathFollower will take it 
         all the way to the last tile, at which point it'll wait for 
@@ -93,7 +93,7 @@ class PathFollower:
         """
         Given a path segment, convert it into motion!
         """
-        self.path.commit_to_movement(path_segment[-1])  # tell the Path not to roll back this segment
+        self.path.commit_to_movement(path_segment[-1])  # tell the ToolheadTrajectory not to roll back this segment
         self.motion_driver.enqueue_motion(
             self.motion_style.generate_motion(path_segment)
         )
@@ -104,7 +104,7 @@ class PathFollower:
         move to the MotionDriver each time we arrive at a new tile (and thus complete a 
         previous intertile move). While it's going, Klipper provides the "heartbeat", 
         pushing us updates over websockets which trigger the _update_position() callback
-        which in turn advances us forward in the Path object. Once we hit the end of a Path 
+        which in turn advances us forward in the ToolheadTrajectory object. Once we hit the end of a Path 
         object, though, this regular feedback cycle (ie incoming websocket updates triggering
         new outgoing gcode scripts) stops; we don't send a new motion request and so we stop
         getting motion_report updates back from Klipper.
@@ -112,12 +112,12 @@ class PathFollower:
         To restart this virtuous cycle when appropriate, we use this callback from Path
         to get notified when there's new juicy goodness in the Path that we can start traversing.
         If the cycle is already going then we're chill and don't need to do anything, but if
-        we've hit the end of the Path and stopped already (which is tracked using self.paused)
+        we've hit the end of the ToolheadTrajectory and stopped already (which is tracked using self.paused)
         then we'll resume by 
         """
         if self.paused.is_set():
             # Resume motion. Note that self.path.first_committed() should be valid here;
-            # we really can't get into this state without having advanced down a Path already,
+            # we really can't get into this state without having advanced down a ToolheadTrajectory already,
             # which means that self.path.last_committed() will have a value, and since we 
             # were extended already that means there are definitely fresh tiles to visit
             assert self.path.last_committed() == self.path[0], f"Expected to be paused at the first tile in the path, instead we're paused at {self.path.last_committed()} on path {self.path}???"

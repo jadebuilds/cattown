@@ -1,17 +1,19 @@
-# pathplanner.py
+# pathfinder.py
 #
 # Path planning along the map using A* search.
 # 
 # Author: Zoda
 
-
-from typing import List, Dict, Optional
+import logging
 import numpy as np
 import random
+from typing import List, Dict, Optional
 from queue import PriorityQueue
 
 from .constants import Tile, Path
-from .custommap import load_from_file, tile_is_passable, add_obstacle, Tile
+from .custommap import load_from_file, tile_is_passable, add_obstacle
+
+logger = logging.Logger(__name__)
 
 class PathFinder:
     def __init__(self, map_file: str):
@@ -26,7 +28,7 @@ class PathFinder:
             goal = self._get_random_passable_tile()
             path = self.go_to_coords(start, goal)
             if path: return path
-        print("ERROR: Unable to generate a new path after 100 retries")
+        logger.error("Unable to generate a new path after {retries} retries")
 
     def redraw_path_if_necessary(
         self, 

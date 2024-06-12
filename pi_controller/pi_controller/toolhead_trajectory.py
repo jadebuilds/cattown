@@ -8,14 +8,14 @@ from typing import List, Union, Optional, Callable
 from dataclasses import dataclass
 import threading
 import copy
-from .constants import Tile
+from .constants import Tile, Path
 import logging
 
 
 logger = logging.Logger(__name__)
 
 
-class Path:
+class ToolheadTrajectory:
     """
     A representation of the path for the mouse to follow. Kind of a custom 
     queue data structure, where the PathPlanner is adding tiles on the end / 
@@ -40,7 +40,7 @@ class Path:
     """
 
     def __init__(self,
-                 tiles: Optional[List[Tile]] = None
+                 tiles: Optional[Path] = None
                  ):
         """
         """
@@ -117,7 +117,7 @@ class Path:
 
     # --------------------------- Interface for PathPlanner --------------------------- #        
 
-    def extend(self, new_segment: List[Tile]):
+    def extend(self, new_segment: Path):
         """
         Extend with another path segment.
         """
@@ -160,7 +160,7 @@ class Path:
                 # If we've committed to a destination, then we might only be able 
                 # to truncate that far back
                 if self._committed_destination:
-                    truncate_end = max(
+                    truncate_end_index = max(
                         self._tiles.index(self._committed_destination),
                         self._tiles.index(end_tile)
                     )
@@ -175,7 +175,7 @@ class Path:
     
     # --------------------------- Utility functions for anyone --------------------------- #
 
-    def get_tiles(self) -> List[Tile]:
+    def get_tiles(self) -> Path:
         """
         Pull out the tiles contained within the Path object.
 
@@ -214,7 +214,7 @@ class Path:
                     return None  # We've hit the end of the list
 
 
-    def __getitem__(self, key: Union[int, slice]) -> Union[Tile, List[Tile]]:
+    def __getitem__(self, key: Union[int, slice]) -> Union[Tile, Path]:
         """
         Support integer index and slice access.
 
