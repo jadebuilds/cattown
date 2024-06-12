@@ -126,7 +126,7 @@ class Toolhead:
                             return
                 
                     if not self.paused.is_set():
-                        print("No further tiles in the path! Toolhead will pause")
+                        logger.warning("No further tiles in the path! Toolhead will pause")
                         self.paused.set()
 
                 

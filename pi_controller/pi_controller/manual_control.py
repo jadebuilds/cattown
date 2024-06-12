@@ -7,6 +7,7 @@
 from typing import Optional, Tuple
 import logging
 logging.getLogger('matplotlib').setLevel(logging.INFO)  # https://stackoverflow.com/questions/35325042/python-logging-disable-logging-from-imported-modules
+import colorlog
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle  
 import matplotlib.animation as animation
@@ -115,6 +116,9 @@ class Game:
 def main():
     try:
         logging.basicConfig(level=logging.DEBUG, stream=sys.stdout)
+        logging.getLogger().handlers[0].setFormatter(
+            colorlog.ColoredFormatter("%(asctime)s %(log_color)s[%(levelname)s] %(module)s: %(message)s")
+        )
         game = Game()
         game.run()
     except Exception as e:
@@ -122,5 +126,4 @@ def main():
 
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.DEBUG, format="%(asctime)s [%(levelname)s] %(module)s: %(message)s", stream=sys.stdout)
     main()

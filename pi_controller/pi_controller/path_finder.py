@@ -50,13 +50,13 @@ class PathFinder:
                 return self.redraw_path(start, cat_location)
 
     def go_to_coords(self, start: Tile, goal: Tile) -> Optional[Path]:
-        print("start: ", start)
-        print("goal: ", goal)
-        print("Is goal passable? ", tile_is_passable(self.grid, goal))
-        print("Is start passable? ", tile_is_passable(self.grid, start))
-        print("Start value?", self.grid[start[0]][start[1]])
-        print("Goal value?", self.grid[goal[0]][goal[1]])
-        print("Grid shape?", self.grid.shape)
+        logger.debug("start: ", start)
+        logger.debug("goal: ", goal)
+        logger.debug("Is goal passable? ", tile_is_passable(self.grid, goal))
+        logger.debug("Is start passable? ", tile_is_passable(self.grid, start))
+        logger.debug("Start value?", self.grid[start[0]][start[1]])
+        logger.debug("Goal value?", self.grid[goal[0]][goal[1]])
+        logger.debug("Grid shape?", self.grid.shape)
         return self._a_star(start, goal)
 
     def _get_neighbors(self, tile: Tile) -> List[Tile]:
