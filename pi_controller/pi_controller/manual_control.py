@@ -97,7 +97,7 @@ class Game:
         if event.inaxes:
             x, y = round(event.xdata), round(event.ydata)
             logger.info(f"Click on {x}, {y}! Let's go there")
-            self.toolhead_path.clear()  # clears back to last_committed()
+
             new_segment = self.path_finder.go_to_coords(
                 start=self.toolhead_path.last_committed(),
                 goal=(x, y)
@@ -105,6 +105,7 @@ class Game:
             if not new_segment:
                 logger.warning(f"Failed to plan between {self.toolhead_path.last_committed()} and {(x,y)}!!!")
             else:
+                self.toolhead_path.clear()  # clears back to last_committed()
                 self.toolhead_path.extend(new_segment)
 
     def run(self):

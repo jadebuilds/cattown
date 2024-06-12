@@ -95,6 +95,7 @@ class ToolheadTrajectory:
                     # This really shouldn't be happening but I believe that it is somehow?
                     logger.warn("Advancing path past self._committed_destination! wtf")
                     logger.warn(f"self: {self}")
+                    logger.warn(f"current_tile: {current_tile}")
                     logger.warn(f"self._committed_destination: {self._committed_destination}")
                     logger.warn(f"tile_index: {tile_index}")
 
@@ -145,6 +146,9 @@ class ToolheadTrajectory:
         Extend with another path segment.
         """
         with self._lock:
+            # Bugfix: drop redundant tiles at start of movement
+            if self._tiles and new_segment[0] == self._tiles[-1]:
+                new_segment = new_segment[1:]
             self._tiles.extend(new_segment)
 
         logger.debug(f"Extended path by {len(new_segment)} tiles: {self}")

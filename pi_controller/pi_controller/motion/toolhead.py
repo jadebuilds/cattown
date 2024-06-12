@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 class Toolhead:
 
     # How far ahead to buffer tiles in the move queue.
-    MOVE_BUFFER_DEPTH_TILES = 12
+    MOVE_BUFFER_DEPTH_TILES = 7
 
     def __init__(self,
                  motion_driver: MotionDriver,
@@ -34,7 +34,7 @@ class Toolhead:
 
         self.last_tile: Optional[Tile] = None
 
-        self.paused = threading.Event()
+        self.paused_or_pausing = threading.Event()
         self.on_path = threading.Event()  # will be set at startup once we hit the start of the path
 
         logger.info(f"Toolhead ready! Starting position: {self.get_current_tile()}")
@@ -69,7 +69,7 @@ class Toolhead:
                 path.extend([current_tile])  # current tile is in the path...
                 path.commit_to_movement(current_tile)  # ... and "committed to"
                 self.on_path.set()  # We're definitely on path
-                self.paused.set()  # we'll set this after path.extend() so the callback doesn't try to start us again
+                self.paused_or_pausing.set()  # we'll set this after path.extend() so the callback doesn't try to start us again
 
     def set_motion_style(self, motion_style: MotionStyle):
         """
@@ -119,15 +119,18 @@ class Toolhead:
                     if num_advanced > 0:
                         self.last_tile = current_tile
                         next_tiles_up = self.path.first_n_uncommitted(num_advanced)
+
                         if next_tiles_up:
                             # Path segment needs to start at the first committed-to tile and go from there
                             tiles_to_move = [self.path.last_committed()] + next_tiles_up
                             self._enqueue_motion(tiles_to_move)
                             return
                 
-                    if not self.paused.is_set():
-                        logger.warning("No further tiles in the path! Toolhead will pause")
-                        self.paused.set()
+                        else:
+                            # There's nothing uncommitted-to in the trajectory, so we'll consider ourselves "pausing"
+                            if not self.paused_or_pausing.is_set():
+                                logger.warning("No further tiles in the path! Toolhead will pause")
+                                self.paused_or_pausing.set()
 
                 
     def _enqueue_motion(self, path_segment: List[Tile]):
@@ -157,16 +160,12 @@ class Toolhead:
         we've hit the end of the ToolheadTrajectory and stopped already (which is tracked using self.paused)
         then we'll resume by 
         """
-        if self.paused.is_set():
+        if self.paused_or_pausing.is_set():
             logger.info("Resuming motion!")
-            # Resume motion. Note that self.path.first_committed() should be valid here;
-            # we really can't get into this state without having advanced down a ToolheadTrajectory already,
-            # which means that self.path.last_committed() will have a value, and since we 
-            # were extended already that means there are definitely fresh tiles to visit
-            assert self.path.last_committed() == self.path[0], f"Expected to be paused at the first tile in the path, instead we're paused at {self.path.last_committed()} on path {self.path}???"
-            # ^^ note that when we say "paused at" we mean "paused at or soon to be paused at", because
-            # it's possible that the path will be extended while we're still in motion
-            self._enqueue_motion(self.path[:self.MOVE_BUFFER_DEPTH_TILES])  # three tiles again to have some buffer
-            self.paused.clear()  # Engine is going, alle ist gut
+            # Resume motion. Note that we have ceased to 
+            
+            # TODO track the actual outgoing buffer depth here (if we're mid-motion this will commit "too much")
+            self._enqueue_motion(self.path.first_n_uncommitted(self.MOVE_BUFFER_DEPTH_TILES))
+            self.paused_or_pausing.clear()  # Engine is going, alle ist gut
         else:
             logger.debug("Path extended; toolhead is already in motion")
