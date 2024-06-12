@@ -21,6 +21,7 @@ from .path_finder import PathFinder
 from .toolhead_trajectory import ToolheadTrajectory
 from .motion.toolhead import Toolhead
 from .motion.moonraker import MoonrakerSocket
+from .motion.mock_driver import MockMotionDriver
 from .motion.styles import SimpleStraightLines
 from .constants import OPEN_SAUCE_MAP_CONFIG
 
@@ -31,7 +32,8 @@ class Game:
         self.lock = threading.Lock()
         self.path_finder = PathFinder('pi_controller/map.csv')
         self.toolhead = Toolhead(
-            MoonrakerSocket('cattown001.local'),
+            MockMotionDriver(),
+            # MoonrakerSocket('cattown001.local'),
             SimpleStraightLines(speed_mm_s=800.0, map_config=OPEN_SAUCE_MAP_CONFIG),
             OPEN_SAUCE_MAP_CONFIG
         )
