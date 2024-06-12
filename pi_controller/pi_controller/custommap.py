@@ -52,7 +52,9 @@ def load_from_file(csv_filepath: str) -> np.ndarray:
     return map
 
 
-def tile_is_passable(tile_value: int) -> bool:
+def tile_is_passable(map: np.ndarray, tile: Tile) -> bool:
+    x, y = tile[0], tile[1]
+    tile_value = map[x][y]
     return (
         (tile_value != INACCESSIBLE) and
         (tile_value != IMPASSABLE)

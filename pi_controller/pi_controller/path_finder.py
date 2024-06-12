@@ -18,6 +18,7 @@ logger = logging.Logger(__name__)
 class PathFinder:
     def __init__(self, map_file: str):
         self.grid = load_from_file(map_file)
+        self.grid = np.transpose(self.grid)
         self.map_width, self.map_height = self.grid.shape
 
     def redraw_path(self, start: Tile, cat_location: Tile) -> Path:
@@ -49,6 +50,13 @@ class PathFinder:
                 return self.redraw_path(start, cat_location)
 
     def go_to_coords(self, start: Tile, goal: Tile) -> Optional[Path]:
+        print("start: ", start)
+        print("goal: ", goal)
+        print("Is goal passable? ", tile_is_passable(self.grid, goal))
+        print("Is start passable? ", tile_is_passable(self.grid, start))
+        print("Start value?", self.grid[start[0]][start[1]])
+        print("Goal value?", self.grid[goal[0]][goal[1]])
+        print("Grid shape?", self.grid.shape)
         return self._a_star(start, goal)
 
     def _get_neighbors(self, tile: Tile) -> List[Tile]:
@@ -58,7 +66,7 @@ class PathFinder:
             for dx, dy in directions
             if 0 <= tile[0] + dx < self.map_width
             and 0 <= tile[1] + dy < self.map_height
-            and tile_is_passable(self.grid[tile[0] + dx, tile[1] + dy])
+            and tile_is_passable(self.grid, (tile[0] + dx, tile[1] + dy))
         ]
 
     def _a_star(self, start: Tile, goal: Tile) -> Optional[Path]:
