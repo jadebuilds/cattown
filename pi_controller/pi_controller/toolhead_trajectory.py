@@ -195,7 +195,7 @@ class ToolheadTrajectory:
                 n_truncated = len(self._tiles) - truncate_end_index - 1
                 self._tiles = self._tiles[:truncate_end_index + 1]  # keep the end_tile in the list
                 
-                logger.info(f"Path truncated by {n_truncated}: {self}")
+                logger.debug(f"Path truncated by {n_truncated}: {self}")
                 return self._tiles[-1]
     
     # --------------------------- Utility functions for anyone --------------------------- #

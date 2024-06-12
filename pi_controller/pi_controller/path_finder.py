@@ -13,7 +13,7 @@ from queue import PriorityQueue
 from .constants import Tile, Path
 from .custommap import load_from_file, tile_is_passable, add_obstacle
 
-logger = logging.Logger(__name__)
+logger = logging.getLogger(__name__)
 
 class PathFinder:
     def __init__(self, map_file: str):

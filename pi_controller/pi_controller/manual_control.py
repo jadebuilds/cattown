@@ -26,7 +26,7 @@ from .motion.mock_driver import MockMotionDriver
 from .motion.styles import SimpleStraightLines
 from .constants import OPEN_SAUCE_MAP_CONFIG
 
-logger = logging.Logger(__name__)
+logger = logging.getLogger(__name__)
 
 class Game:
     def __init__(self):
