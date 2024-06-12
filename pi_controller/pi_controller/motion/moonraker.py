@@ -9,9 +9,10 @@ import websockets
 import json
 import threading
 import time
+import logging
+logging.getLogger('websockets').setLevel(logging.INFO)
 import websockets
 import threading
-import logging
 import websockets.sync
 import websockets.sync.client
 
@@ -40,9 +41,9 @@ class MoonrakerSocket(MotionDriver):
         """
 
         self.hostname = hostname
-        self.ws = websockets.sync.client.connect(
-            PRIMARY_WEBSOCKET_URL.format(hostname=hostname)
-        )
+        ws_url = PRIMARY_WEBSOCKET_URL.format(hostname=hostname)
+        self.ws = websockets.sync.client.connect(ws_url)
+        logger.info(f"Connected to {ws_url}. Game on :)")
 
         self.next_cmd_id = ThreadSafeMonotonicCounter()
 
@@ -67,6 +68,7 @@ class MoonrakerSocket(MotionDriver):
         self.rx_thread.start()
         
         # Subscribe to motion report so we can get those sweet live position updates
+        logger.info("Subscribing to Klipper motion_report...")
         self._send({
             "method": "printer.objects.subscribe",
              "params": {
@@ -158,25 +160,22 @@ class MoonrakerSocket(MotionDriver):
                 # After that we'll get a stream of differently formatted notify_status_update
                 # messages which have the thing we need!
                 elif data['method'] == 'notify_status_update':
-                    print("got notify_status_update")
                     eventtime = data['params'][1]  # pretty sure! why is it not labeled? idk
-                    print(f"  > eventtime: {eventtime}")
                     pos_4d = data['params'][0]['motion_report']['live_position']
                     new_location = Point(pos_4d[0], pos_4d[1])
-                    print(f"  > pos4d: {pos_4d}")
                     # TODO how do I flow-control this to not repeat this code?
                 
                 if new_location:
+                    if not self._current_location:
+                        logger.info(f"Got starting location from Moonraker! {new_location}")
                     with self._state_lock:
                         self._current_location = new_location
-                        print(f"Got location! {self._current_location}")
                         self._last_update_timestamp = eventtime
                         for callback in self._position_callbacks:
                             callback(new_location)
 
             except KeyError:
-                print(f"No motion_report to see here: {message}")
-                pass  # TODO set up logging so we can trace-level log here
+                pass  # We will ignore messages that we don't need
 
 
 if __name__ == "__main__":

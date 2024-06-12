@@ -1,8 +1,12 @@
-# path.py
+# toolhead_trajectory.py
 # 
 # A class for representing paths of motion along the play wall.
 # This serves as a central hinge point for translating mapping
 # into physical motion and back.
+# 
+# Named "Toolhead" because that's the term that Klipper uses
+# to describe the thing the 3D printer is moving around (an extruder
+# or whatever). In this case the tool is a magnet :)
 
 from typing import List, Union, Optional, Callable
 from dataclasses import dataclass
@@ -12,7 +16,7 @@ from .constants import Tile, Path
 import logging
 
 
-logger = logging.Logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 class ToolheadTrajectory:
@@ -53,11 +57,15 @@ class ToolheadTrajectory:
 
     # --------------------------- Interface for MotionDriver --------------------------- #
 
-    def advance(self, current_tile: Tile):
+    def advance(self, current_tile: Tile) -> int:
         """
         Advance along the path to the current position -- that is, 
         drop every Tile along the path that comes before the tile that
         we're currently on.
+
+        Returns the number of tiles removed from the stack, so we can
+        replace them in the correct number. (This will happen often when
+        we do fast moves with lots of tiles crossed per websocket update!)
 
         Note that this method leaves current_tile in the Path object. 
         For example:
@@ -67,6 +75,7 @@ class ToolheadTrajectory:
         >>> path.advance((1, 2))
         >>> path
         Path([(1, 2), (2, 2)])
+        
         ```
 
         I think this should work even for paths that cross themselves. Not that
@@ -78,9 +87,23 @@ class ToolheadTrajectory:
         Raises IndexError if the tile passed is not present in the path.
         """
         try:
-            with self._lock:    
+            with self._lock:
                 tile_index = self._tiles.index(current_tile)
+
+                # TODO debugging code rm
+                if tile_index != 0 and self._committed_destination in self._tiles[:tile_index]:
+                    # This really shouldn't be happening but I believe that it is somehow?
+                    logger.warn("Advancing path past self._committed_destination! wtf")
+                    logger.warn(f"self: {self}")
+                    logger.warn(f"self._committed_destination: {self._committed_destination}")
+                    logger.warn(f"tile_index: {tile_index}")
+
+
                 self._tiles = self._tiles[tile_index:]  # leaves current_tile in the list
+                if tile_index != 1:
+                    logger.debug(f"Advanced path by {tile_index}")
+                return tile_index  # tile_index=0 means 0 tiles removed etc.
+            
         except ValueError as e:
             raise IndexError(f"Tile {current_tile} is not in path {self}!") from e
 
@@ -121,14 +144,13 @@ class ToolheadTrajectory:
         """
         Extend with another path segment.
         """
-
         with self._lock:
             self._tiles.extend(new_segment)
 
         for callback in self._extend_callbacks:
             callback()  # again, used by Toolhead to know that it's time to resume
         
-        logger.info("Path extended: {self}")
+        logger.info(f"Path extended: {self}")
 
     def clear(self) -> Tile:
         """
@@ -198,7 +220,7 @@ class ToolheadTrajectory:
         with self._lock:
             return self._committed_destination
 
-    def first_uncommitted(self) -> Optional[Tile]:
+    def first_n_uncommitted(self, n: int) -> Optional[List[Tile]]:
         """
         The next tile past that one... if there is such a tile. If we've already
         committed to the whole path, then this returns None.
@@ -209,7 +231,7 @@ class ToolheadTrajectory:
                 # self._committed_destination without committing to a further tile first
                 committed_index = self._tiles.index(self._committed_destination)
                 try:
-                    return self._tiles[committed_index + 1]
+                    return self._tiles[committed_index + 1 : committed_index + 1 + n]
                 except IndexError:
                     return None  # We've hit the end of the list
 
@@ -243,4 +265,4 @@ class ToolheadTrajectory:
         # That exposes us to edge cases in which self._tiles gets mutated while
         # we're translating it to str, in which case............ idk! We'll
         # figure it out!
-        return f"Path: {len(self._tiles)} tiles, {self[0]} --> {self[-1]}"
+        return f"Path: {len(self._tiles)} tiles, {self._tiles}"
