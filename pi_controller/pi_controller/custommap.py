@@ -99,3 +99,4 @@ def to_tile(point: Point, map_config: MapConfig) -> Tile:
     assert 0 <= tile[0] <= map_config.grid_size_x, f"X={tile[0]} (from point {point}) is not in bounds!"
     assert 0 <= tile[1] <= map_config.grid_size_y, f"Y={tile[1]} (from point {point}) is not in bounds!"
 
+    return tile
