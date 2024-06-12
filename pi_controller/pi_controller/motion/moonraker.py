@@ -105,7 +105,7 @@ class MoonrakerSocket(MotionDriver):
             t_timeout = t_now + 2.0
             while time.monotonic() < t_timeout:
                 if (self._current_location):
-                    break
+                    return self._current_location
                 time.sleep(0.1)
 
             raise TimeoutError("Unable to get a position from Moonraker :(")
