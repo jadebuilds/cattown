@@ -147,12 +147,12 @@ class ToolheadTrajectory:
         with self._lock:
             self._tiles.extend(new_segment)
 
+        logger.debug(f"Extended path by {len(new_segment)} tiles: {self}")
+
         for callback in self._extend_callbacks:
             callback()  # again, used by Toolhead to know that it's time to resume
         
-        logger.info(f"Path extended: {self}")
-
-    def clear(self) -> Tile:
+    def clear(self) -> Optional[Tile]:
         """
         Attempt to drop as much of the upcoming path as we can.
 
@@ -160,8 +160,11 @@ class ToolheadTrajectory:
 
         If we haven't committed to any movement, drops all but the current
         tile and returns that tile.
+
+        If the trajectory is totally empty, return None.
         """
-        return self.truncate_at(self[0])  # attempt to truncate at the starting position
+        if len(self._tiles) > 0:
+            return self.truncate_at(self[0])  # attempt to truncate at the starting position
 
 
     def truncate_at(self, end_tile: Tile) -> Tile:
@@ -205,7 +208,6 @@ class ToolheadTrajectory:
         / around the lock and mutate the internal list.
         """
         with self._lock:
-            logger.debug("get_tiles(): shallow-copying tiles")  # make sure we don't accidentally do this too much
             return copy.copy(self._tiles)  # shallow-copy so that we don't accidentally list mumble mutate
 
     def __len__(self):
@@ -258,6 +260,13 @@ class ToolheadTrajectory:
         """
         with self._lock:
                 return self._tiles[key]
+
+    def __contains__(self, tile: Tile):
+        """
+        Support `if tile in trajectory:` syntax 
+        """
+        with self._lock:
+            return tile in self._tiles
 
     def __str__(self) -> str:
         # I keep trying to print(self) during critical sections in which

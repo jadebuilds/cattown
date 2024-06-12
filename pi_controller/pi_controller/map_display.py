@@ -45,7 +45,7 @@ class Game:
         # Initialize the plot
         self.map = load_from_file('pi_controller/map.csv')
         self.fig, self.ax = plt.subplots()
-        self.cax = self.ax.matshow(self.map, cmap='Grays')
+        self.cax = self.ax.matshow(self.map, cmap='Grays', origin='lower')
         self.mouse, = self.ax.plot([], [], 'bo')
         self.cat, = self.ax.plot([], [], 'ro')
         self.path_line, = self.ax.plot([], [], 'b--')

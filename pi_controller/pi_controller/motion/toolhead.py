@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 class Toolhead:
 
     # How far ahead to buffer tiles in the move queue.
-    MOVE_BUFFER_DEPTH_TILES = 6
+    MOVE_BUFFER_DEPTH_TILES = 12
 
     def __init__(self,
                  motion_driver: MotionDriver,
@@ -56,9 +56,20 @@ class Toolhead:
         logger.info(f"Following path: {path}")
         self.path = path
         self.path.subscribe_to_extend(self._path_extended)
-        self._enqueue_motion(path[:self.MOVE_BUFFER_DEPTH_TILES])  # start us in motion!
-        # Note that I'm submitting three units so that we have some buffer in 
-        # the submitted queue.
+        if len(self.path) > 1:
+            self._enqueue_motion(path[:self.MOVE_BUFFER_DEPTH_TILES])  # start us in motion!
+            # Note that I'm submitting three units so that we have some buffer in 
+            # the submitted queue.
+        else:
+            logger.info("Toolhead asked to follow an empty path; will start paused")
+            
+            if len(self.path) == 0:    
+                current_tile = self.get_current_tile()
+                logger.debug(f"Toolhead path is completely empty; pre-populating with where we are, {current_tile}")
+                path.extend([current_tile])  # current tile is in the path...
+                path.commit_to_movement(current_tile)  # ... and "committed to"
+                self.on_path.set()  # We're definitely on path
+                self.paused.set()  # we'll set this after path.extend() so the callback doesn't try to start us again
 
     def set_motion_style(self, motion_style: MotionStyle):
         """
@@ -88,14 +99,12 @@ class Toolhead:
             if current_tile != self.last_tile:
                 logger.debug(f"Entered new tile! {current_tile}")
                 
-                if current_tile == self.path[0]:
-                    # We don't consider ourselves on-path until we reach the starting tile.
-                    # At start of path following we'll be translating from god knows where 
-                    # to the first tile and we don't want to cross the path and try to advance()
-                    # it to like this random intersection point, potentially dropping the whole 
-                    # starting segment.
+                if not self.on_path.is_set() and current_tile in self.path:
+                    # Consider ourselves on-path as soon as we encounter the path. Note that
+                    # this might have unexpected behavior if we translate across the path to get to 
+                    # the start of the path; let's just not do that please
                     logger.info(f"Reached tile {current_tile}; toolhead is on-path!")
-                    self.on_path.set()  
+                    self.on_path.set()
 
                 if self.on_path.is_set():
 
@@ -114,11 +123,11 @@ class Toolhead:
                             # Path segment needs to start at the first committed-to tile and go from there
                             tiles_to_move = [self.path.last_committed()] + next_tiles_up
                             self._enqueue_motion(tiles_to_move)
-
-                    else:
-                        if not self.paused.is_set():
-                            print("No further tiles in the path! Toolhead will pause")
-                            self.paused.set()
+                            return
+                
+                    if not self.paused.is_set():
+                        print("No further tiles in the path! Toolhead will pause")
+                        self.paused.set()
 
                 
     def _enqueue_motion(self, path_segment: List[Tile]):
@@ -149,6 +158,7 @@ class Toolhead:
         then we'll resume by 
         """
         if self.paused.is_set():
+            logger.info("Resuming motion!")
             # Resume motion. Note that self.path.first_committed() should be valid here;
             # we really can't get into this state without having advanced down a ToolheadTrajectory already,
             # which means that self.path.last_committed() will have a value, and since we 
@@ -158,3 +168,5 @@ class Toolhead:
             # it's possible that the path will be extended while we're still in motion
             self._enqueue_motion(self.path[:self.MOVE_BUFFER_DEPTH_TILES])  # three tiles again to have some buffer
             self.paused.clear()  # Engine is going, alle ist gut
+        else:
+            logger.debug("Path extended; toolhead is already in motion")

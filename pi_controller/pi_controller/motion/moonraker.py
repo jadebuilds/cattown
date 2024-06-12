@@ -164,7 +164,7 @@ class MoonrakerSocket(MotionDriver):
                     pos_4d = data['params'][0]['motion_report']['live_position']
                     new_location = Point(pos_4d[0], pos_4d[1])
                     # TODO how do I flow-control this to not repeat this code?
-                
+
                 if new_location:
                     if not self._current_location:
                         logger.info(f"Got starting location from Moonraker! {new_location}")

@@ -47,7 +47,9 @@ def load_from_file(csv_filepath: str) -> np.ndarray:
     https://docs.google.com/spreadsheets/d/1h3TzB2h-GPvKF6A5ktIeTxZr08u3RLS3S5u_wHjHqy4/edit#gid=0
     """
     map = np.genfromtxt(csv_filepath, delimiter=',')  # type: np.ndarray
-    return np.nan_to_num(map)
+    map = np.flipud(map)  # Reads the CSV file as "first row in the file is 0", but we want the bottom/last row to be 0
+    map = np.nan_to_num(map)  # Replace NaN with 0 so any empty cell in the CSV is assumed to be 0/traversable
+    return map
 
 
 def tile_is_passable(tile_value: int) -> bool:
@@ -91,9 +93,9 @@ def to_tile(point: Point, map_config: MapConfig) -> Tile:
     """
 
     tile = (
-        # int() floors but round() rounds to the nearest integer; i.e. int(5.6) == 5, round(5.6) == 6.
-        round(((point.x_mm - map_config.map_x_offset) / map_config.map_grid_spacing_mm)),
-        round(((point.y_mm - map_config.map_y_offset) / map_config.map_grid_spacing_mm))
+        # int() floors, which is what we want
+        int(((point.x_mm - map_config.map_x_offset) / map_config.map_grid_spacing_mm)),
+        int(((point.y_mm - map_config.map_y_offset) / map_config.map_grid_spacing_mm))
     )
     
     assert 0 <= tile[0] <= map_config.grid_size_x, f"X={tile[0]} (from point {point}) is not in bounds!"
