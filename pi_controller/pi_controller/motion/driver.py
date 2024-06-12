@@ -39,7 +39,7 @@ class MotionDriver(metaclass=ABCMeta):
         """
         Add motion to the queue. This is considered irreversible -- once motion is
         enqueued we don't expect to take it back. If you want to queue up motion and
-        then change your mind, consider using a PathFollower!
+        then change your mind, consider using a Toolhead!
         """
 
     @abstractmethod

@@ -92,8 +92,8 @@ def to_tile(point: Point, map_config: MapConfig) -> Tile:
 
     tile = (
         # int() floors but round() rounds to the nearest integer; i.e. int(5.6) == 5, round(5.6) == 6.
-        round((point.x_mm - map_config.map_x_offset) / map_config.map_grid_spacing_mm),
-        round((point.y_mm - map_config.map_y_offset) / map_config.map_grid_spacing_mm)
+        round(((point.x_mm - map_config.map_x_offset) / map_config.map_grid_spacing_mm)),
+        round(((point.y_mm - map_config.map_y_offset) / map_config.map_grid_spacing_mm))
     )
     
     assert 0 <= tile[0] <= map_config.grid_size_x, f"X={tile[0]} (from point {point}) is not in bounds!"

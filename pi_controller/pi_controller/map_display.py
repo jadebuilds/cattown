@@ -21,7 +21,7 @@ import sys
 from .custommap import load_from_file
 from .path_finder import PathFinder
 from .toolhead_trajectory import ToolheadTrajectory
-from .motion.pathfollow import PathFollower
+from .motion.pathfollow import Toolhead
 from .motion.moonraker import MoonrakerSocket
 from .motion.styles import SimpleStraightLines
 from .constants import OPEN_SAUCE_MAP_CONFIG
@@ -36,7 +36,7 @@ class Game:
         self.toolhead_path = ToolheadTrajectory()
         self.minimum_path_len = 2
         self.cat_closeness_threshhold = 2
-        self.path_follower = PathFollower(
+        self.path_follower = Toolhead(
             MoonrakerSocket('cattown001.local'),
             SimpleStraightLines(speed_mm_s=200.0, map_config=OPEN_SAUCE_MAP_CONFIG),
             OPEN_SAUCE_MAP_CONFIG

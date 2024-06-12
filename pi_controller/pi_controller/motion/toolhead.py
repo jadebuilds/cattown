@@ -1,5 +1,6 @@
 from typing import Optional, List
 import threading
+import logging
 
 from ..constants import Point, Tile
 from ..toolhead_trajectory import ToolheadTrajectory
@@ -7,7 +8,10 @@ from .driver import MotionDriver
 from ..custommap import MapConfig, to_tile
 from .styles import MotionStyle
 
-class PathFollower:
+logger = logging.getLogger(__name__)
+
+
+class Toolhead:
 
     def __init__(self,
                  motion_driver: MotionDriver,
@@ -38,7 +42,7 @@ class PathFollower:
 
     def follow_path(self, path: ToolheadTrajectory):
         """
-        Start following the attached Path. PathFollower will take it 
+        Start following the attached Path. Toolhead will take it 
         all the way to the last tile, at which point it'll wait for 
         more tiles to be added for the Path (which should then get consumed).
         """
@@ -71,6 +75,7 @@ class PathFollower:
         moved into a new tile, and if we have, then tries to enqueue motion to
         the next tile down.
         """
+        print("_update_position() called")
         if self.path:
             current_tile = to_tile(current_position, map_config=self.map_config)
             
@@ -85,7 +90,7 @@ class PathFollower:
                         next_tile_up
                     ])
                 else:
-                    print("No further tiles in the path! PathFollower is pausing")
+                    print("No further tiles in the path! Toolhead is pausing")
                     self.paused.set()
 
                 
@@ -94,13 +99,14 @@ class PathFollower:
         Given a path segment, convert it into motion!
         """
         self.path.commit_to_movement(path_segment[-1])  # tell the ToolheadTrajectory not to roll back this segment
+        logger.debug(f"Enqueuing motion through {len(path_segment)} tiles: {path_segment}")
         self.motion_driver.enqueue_motion(
             self.motion_style.generate_motion(path_segment)
         )
 
     def _path_extended(self):
         """
-        PathFollower does a "1-for-1" queue replacement, pushing another intertile
+        Toolhead does a "1-for-1" queue replacement, pushing another intertile
         move to the MotionDriver each time we arrive at a new tile (and thus complete a 
         previous intertile move). While it's going, Klipper provides the "heartbeat", 
         pushing us updates over websockets which trigger the _update_position() callback

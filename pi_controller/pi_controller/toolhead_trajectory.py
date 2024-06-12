@@ -19,7 +19,7 @@ class ToolheadTrajectory:
     """
     A representation of the path for the mouse to follow. Kind of a custom 
     queue data structure, where the PathPlanner is adding tiles on the end / 
-    redoing the path toward the end while PathFollower chews tiles off the front
+    redoing the path toward the end while Toolhead chews tiles off the front
     (tracking the progress of the physical mouse). Thread-safe (thorough
     lock use, not at all optimized) and should be conflict-free.
 
@@ -104,11 +104,11 @@ class ToolheadTrajectory:
 
     def subscribe_to_extend(self, callback: Callable):
         """
-        PathFollower needs to know when the Path gets extended; this way it can
+        Toolhead needs to know when the Path gets extended; this way it can
         "bottom out" at the end of a Path that hasn't gotten updated, stop, then resume
-        when the Path is extended. (See PathFollower._path_extended() !)
+        when the Path is extended. (See Toolhead._path_extended() !)
 
-        This method lets PathFollower install a callback that gets called when extend()
+        This method lets Toolhead install a callback that gets called when extend()
         is invoked. Callbacks have no arguments, it's assumed that 
         """
         with self._lock:
@@ -126,7 +126,7 @@ class ToolheadTrajectory:
             self._tiles.extend(new_segment)
 
         for callback in self._extend_callbacks:
-            callback()  # again, used by PathFollower to know that it's time to resume
+            callback()  # again, used by Toolhead to know that it's time to resume
         
         logger.info("Path extended: {self}")
 
