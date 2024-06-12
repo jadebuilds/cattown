@@ -75,12 +75,21 @@ class Toolhead:
         moved into a new tile, and if we have, then tries to enqueue motion to
         the next tile down.
         """
-        print("_update_position() called")
         if self.path:
             current_tile = to_tile(current_position, map_config=self.map_config)
             
             if current_tile != self.last_tile:
-                self.path.advance(current_tile)
+                logger.debug(f"Entered new tile! {current_tile}")
+                # We might be off-path, for example if we're just starting up or
+                # if somebody has done like a DropOffMouse or something. That's fine,
+                # if the tile we're on isn't on the path then I think we can assume 
+                # that we'll keep moving until we do reach the path. So we'll just
+                # ignore this.
+                try:
+                    self.path.advance(current_tile)
+                except IndexError:
+                    logger.debug("  > We're off-path, so we won't advance the path for this one")
+                    return
                 
                 last_tile_enqueued = self.path.last_committed()
                 next_tile_up = self.path.first_uncommitted()

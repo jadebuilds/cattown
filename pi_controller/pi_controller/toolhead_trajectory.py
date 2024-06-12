@@ -81,8 +81,8 @@ class ToolheadTrajectory:
             with self._lock:    
                 tile_index = self._tiles.index(current_tile)
                 self._tiles = self._tiles[tile_index:]  # leaves current_tile in the list
-        except ValueError:
-            raise IndexError(f"Tile {current_tile} is not in path {self}!")
+        except ValueError as e:
+            raise IndexError(f"Tile {current_tile} is not in path {self}!") from e
 
     def commit_to_movement(self, target_tile: Tile):
         """
