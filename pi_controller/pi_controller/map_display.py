@@ -1,9 +1,10 @@
 # map_display.py
 # 
-# Emulator, lets us test the paths we've drawn using custommap and pathfinder 
-# module. Uses matplot for animations. Can use cursor as the cat to see how the 
-# the pathfinder will react. 
-# 
+# Our GameEngine animates what is happening between our movement 
+# system using the KlipperSocket and what the camera module 
+# detects is a cat. Uses pathfinder to keep the mouse moving 
+# between coordinates. 
+#  
 # Author: Zoda
 
 import logging
@@ -21,8 +22,9 @@ import sys
 from .custommap import load_from_file
 from .path_finder import PathFinder
 from .toolhead_trajectory import ToolheadTrajectory
-from .motion.pathfollow import Toolhead
+from .motion.toolhead import Toolhead
 from .motion.moonraker import MoonrakerSocket
+from .motion.mock_driver import MockMotionDriver
 from .motion.styles import SimpleStraightLines
 from .constants import OPEN_SAUCE_MAP_CONFIG
 
@@ -30,15 +32,15 @@ logger = logging.Logger(__name__)
 
 class Game:
     def __init__(self):
-        self.game_active = True
         self.lock = threading.Lock()
-        self.path_finder = PathFinder('pi_controller/map.csv')
-        self.toolhead_path = ToolheadTrajectory()
         self.minimum_path_len = 2
         self.cat_closeness_threshhold = 2
+        self.path_finder = PathFinder('pi_controller/map.csv')
+        self.toolhead_path = ToolheadTrajectory()
         self.path_follower = Toolhead(
-            MoonrakerSocket('cattown001.local'),
-            SimpleStraightLines(speed_mm_s=200.0, map_config=OPEN_SAUCE_MAP_CONFIG),
+            MockMotionDriver(),
+            # MoonrakerSocket('cattown001.local'),
+            SimpleStraightLines(speed_mm_s=800.0, map_config=OPEN_SAUCE_MAP_CONFIG),
             OPEN_SAUCE_MAP_CONFIG
         )
 
@@ -49,15 +51,14 @@ class Game:
         self.mouse, = self.ax.plot([], [], 'bo')
         self.cat, = self.ax.plot([], [], 'ro')
         self.path_line, = self.ax.plot([], [], 'b--')
-        self.game_over_text = self.ax.text(0.5, 0.5, '', transform=self.ax.transAxes, ha='center', va='center', color='red', fontsize=16, bbox={'facecolor': 'white', 'alpha': 0.5, 'pad': 10})
         self.mouse_box = Rectangle((0, 0), 3, 3, fill=False, edgecolor='black', linewidth=1)  
         self.ax.add_patch(self.mouse_box) 
         self.mouse_box.set_visible(False)
 
         # Initialize the parameters
         self.mouse_location = self.path_follower.get_current_tile()
-        self.cat_location = (10, 13)
-        self.mouse_goal_location = (6, 8)
+        self.cat_location = (13, 8)
+        self.mouse_goal_location = (13, 4)
         self.path = self.path_finder.go_to_coords(self.mouse_location, self.mouse_goal_location)
 
         # Event listener and the animation function in the main thread
@@ -69,42 +70,29 @@ class Game:
     def _animation_init(self):
         self.mouse.set_data([], [])
         self.path_line.set_data([], [])
-        return self.mouse, self.cat, self.path_line, self.game_over_text
+        return self.mouse, self.cat, self.path_line
 
     # Animation function 
     def animate(self, i):
-        self.mouse_box.set_visible(True)
         with self.lock:
-            if not self.game_active:
-                logger.info("Caught by the cat!")
-                self.game_over_text.set_text("Caught by the cat!")
-                self.mouse.set_color("black")  
-                self.fig.canvas.draw() 
-            elif self.path:
-                x, y = zip(*self.path)
-                self.mouse.set_data([self.mouse_location[1]], [self.mouse_location[0]])
-                self.cat.set_data([self.cat_location[1]], [self.cat_location[0]])
-                self.path_line.set_data(y, x)
-                self.mouse_box.set_xy((self.mouse_location[1] - 1.5, self.mouse_location[0] - 1.5))
+            if len(self.path) < self.minimum_path_len: 
+                logger.debug(f"Increasing path, path length currently {len(self.path)}")
+                self.get_new_path() 
+            
+            self.mouse_location = self.path_follower.get_current_tile()
+            self.mouse.set_data([self.mouse_location[0]], [self.mouse_location[1]])
+            self.cat.set_data([self.cat_location[0]], [self.cat_location[1]])
+            self.mouse_box.set_visible(True)
+            self.mouse_box.set_xy((self.mouse_location[0] - 1.5, self.mouse_location[1] - 1.5))
+            path_tiles = self.toolhead_path.get_tiles()
+            if path_tiles:
+                x, y = zip(*path_tiles)  # zip into two lists of X and Y values
+                self.path = path_tiles
+                self.path_line.set_data(x, y)
 
-        return self.mouse, self.cat, self.path_line, self.mouse_box, self.game_over_text
-        
+        return self.mouse, self.cat, self.path_line, self.mouse_box, 
+    
 
-    # Advances the mouse's path by popping off new coordinates from the path list 
-    def _location_refresh(self):
-        while self.game_active:
-            time.sleep(0.1)
-            with self.lock:
-                # Check if we need to draw a new path 
-                # Under 2 coordinates should give us some time to plan a new path
-                if len(self.path) < self.minimum_path_len: 
-                    self.update_path()
-                if self.path:
-                    self.mouse_location = self.path_follower.get_current_position()
-                    if self.cat_location == self.mouse_location:
-                        self.game_active = False 
-                else:
-                    logger.debug("No coordinates left in path to advance")
 
     # Event listener for cursor movements
     # Updates the cat coordinates for the animation library & recalculates path if cat is close. 
@@ -112,25 +100,17 @@ class Game:
         if event.inaxes:
             x, y = round(event.xdata), round(event.ydata)
             with self.lock:
-                if not self.game_active:
-                    return
-
-                self.cat_location = (y, x)
-                # If cat cought the mouse
-                if self.cat_location == self.mouse_location:
-                    self.game_active = False 
-                    return
+                self.cat_location = (x, y)
                 
                 # If the cat is close, draw a new path
                 dx_too_close = abs(self.cat_location[0] - self.mouse_location[0]) < self.cat_closeness_threshhold
                 dy_too_close = abs(self.cat_location[1] - self.mouse_location[1]) < self.cat_closeness_threshhold
-                cat_is_too_close = dx_too_close or dy_too_close 
+                cat_is_too_close = dx_too_close and dy_too_close 
                 if cat_is_too_close:
-                    # if self.path: self.mouse_location = self.path.pop(0)
-                    self.update_path() 
+                    self.get_new_path() 
 
     # Update path if there is a path returned.
-    def update_path(self):
+    def get_new_path(self, replace: bool = False):
         new_path = self.path_finder.redraw_path_if_necessary(
             start=self.toolhead_path.last_committed(), 
             cat_location=self.cat_location, 
@@ -151,9 +131,7 @@ class Game:
         # Start the first set of movements 
         self.toolhead_path.extend(self.path)
         self.path_follower.follow_path(self.toolhead_path)
-
-        thread = threading.Thread(target=self._location_refresh, daemon=True)
-        thread.start()
+        
         plt.show()
 
 

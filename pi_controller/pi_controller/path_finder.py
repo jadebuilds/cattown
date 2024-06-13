@@ -24,12 +24,14 @@ class PathFinder:
     def redraw_path(self, start: Tile, cat_location: Tile) -> Path:
         retries = 100
         path = None
-        self.grid = add_obstacle(self.grid, cat_location, 2, 2)
+        self.grid = add_obstacle(self.grid, cat_location, 1, 1)
         for i in range(retries):
             goal = self._get_random_passable_tile()
+            print(f"goal: {goal}")
             path = self.go_to_coords(start, goal)
             if path: return path
-        logger.error("Unable to generate a new path after {retries} retries")
+        logger.error(f"Unable to generate a new path after {retries} retries")
+        return []
 
     def redraw_path_if_necessary(
         self, 
@@ -62,7 +64,7 @@ class PathFinder:
             and tile_is_passable(self.grid, (tile[0] + dx, tile[1] + dy))
         ]
 
-    def _a_star(self, start: Tile, goal: Tile) -> Optional[Path]:
+    def _a_star(self, start: Tile, goal: Tile) -> Path:
         open_set = PriorityQueue()
         open_set.put((0, start))
         came_from = {}
@@ -84,7 +86,7 @@ class PathFinder:
                     f_score[neighbor] = tentative_g_score + self._heuristic(neighbor, goal)
                     open_set.put((f_score[neighbor], neighbor))
 
-        return None
+        return []
 
     def _heuristic(self, tile: Tile, goal: Tile) -> int:
         return abs(tile[0] - goal[0]) + abs(tile[1] - goal[1])
