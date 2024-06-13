@@ -27,7 +27,6 @@ class PathFinder:
         self.grid = add_obstacle(self.grid, cat_location, 1, 1)
         for i in range(retries):
             goal = self._get_random_passable_tile()
-            print(f"goal: {goal}")
             path = self.go_to_coords(start, goal)
             if path: return path
         logger.error(f"Unable to generate a new path after {retries} retries")
