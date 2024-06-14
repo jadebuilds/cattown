@@ -24,6 +24,7 @@ from .path_finder import PathFinder
 from .toolhead_trajectory import ToolheadTrajectory
 from .motion.toolhead import Toolhead
 from .motion.moonraker import MoonrakerSocket
+from .ccv import CatVision
 from .motion.mock_driver import MockMotionDriver
 from .motion.styles import SimpleStraightLines
 from .constants import OPEN_SAUCE_MAP_CONFIG
@@ -61,8 +62,10 @@ class Game:
         self.mouse_goal_location = (13, 4)
         self.path = self.path_finder.go_to_coords(self.mouse_location, self.mouse_goal_location)
 
-        # Event listener and the animation function in the main thread
-        self.fig.canvas.mpl_connect('motion_notify_event', self.on_cursor_move)
+        # Initialize vision
+        self.cat_vision = CatVision(display_annotated=True)
+
+        # Animation function in the main thread
         self.ani = animation.FuncAnimation(self.fig, self.animate, init_func=self._animation_init, interval=100, blit=True)
 
 
@@ -91,23 +94,6 @@ class Game:
                 self.path_line.set_data(x, y)
 
         return self.mouse, self.cat, self.path_line, self.mouse_box, 
-    
-
-
-    # Event listener for cursor movements
-    # Updates the cat coordinates for the animation library & recalculates path if cat is close. 
-    def on_cursor_move(self, event):
-        if event.inaxes:
-            x, y = round(event.xdata), round(event.ydata)
-            with self.lock:
-                self.cat_location = (x, y)
-                
-                # If the cat is close, draw a new path
-                dx_too_close = abs(self.cat_location[0] - self.mouse_location[0]) < self.cat_closeness_threshhold
-                dy_too_close = abs(self.cat_location[1] - self.mouse_location[1]) < self.cat_closeness_threshhold
-                cat_is_too_close = dx_too_close and dy_too_close 
-                if cat_is_too_close:
-                    self.get_new_path() 
 
     # Update path if there is a path returned.
     def get_new_path(self, replace: bool = False):
@@ -128,11 +114,32 @@ class Game:
             logger.debug("No new path returned")
 
     def run(self):
+        # Start vision
+        self.cat_vision.start(display_in_GUI=True)  # use XWindows GUI on Mac (rather than terminal framebuffer)
+
         # Start the first set of movements 
         self.toolhead_path.extend(self.path)
         self.path_follower.follow_path(self.toolhead_path)
         
         plt.show()
+
+        try:
+            while True:
+                cats, _ = self.cat_vision.find_cats()  # not using mouse detection yet
+
+                # TODO handle multiple "cats"
+                for cat in cats:
+                    self.cat_location = cat['centroid_board']
+                    dx_too_close = abs(self.cat_location[0] - self.mouse_location[0]) < self.cat_closeness_threshhold
+                    dy_too_close = abs(self.cat_location[1] - self.mouse_location[1]) < self.cat_closeness_threshhold
+                    cat_is_too_close = dx_too_close and dy_too_close 
+                    if cat_is_too_close:
+                        self.get_new_path() 
+
+
+        except KeyboardInterrupt:
+            logger.warn("Caught keyboard interrupt, exiting...")
+            self.cat_vision.stop()  # lovely to have a cleanup method. TODO any other cleanup we should do?
 
 
 def main():
