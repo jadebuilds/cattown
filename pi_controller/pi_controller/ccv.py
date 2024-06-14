@@ -13,14 +13,20 @@ import time
 from datetime import datetime
 import threading
 
+import logging
+
+
+logger = logging.getLogger(__name__)
+
+
 class CatVision():
 	def __init__(self, board_width_mm=None, board_height_mm=None, display_annotated=True):
 
 		if not board_width_mm:
 			# TODO: Rough hardcoded values for now
-			self.board_width_mm = round(25.4*72)
+			self.board_width_mm = 600 * 4  # 4x panels, each of which is 600mm (~23.6") wide
 		if not board_height_mm:
-			self.board_height_mm = round(25.4*48)
+			self.board_height_mm = 1180  # from CAD measurement
 
 		self.cam_id = None
 		self.display_annotated = display_annotated
@@ -260,7 +266,7 @@ class CatVision():
 		frame_width = int(self.cap.get(3))
 		frame_height = int(self.cap.get(4))
 		if output_filename is not None:
-			self.file_out = cv.VideoWriter(os.path.join(fdir, output_filename),
+			self.file_out = cv.VideoWriter(output_filename, 
 								  cv.VideoWriter_fourcc('M','P','4','V'), 24, (frame_width,frame_height))
 			
 			if not self.file_out.isOpened():
@@ -273,7 +279,7 @@ class CatVision():
 			self.transform_img_to_board, self.rough_pix_to_mm = self.process_aruco_corners(frame,
 																	self.board_width_mm, self.board_height_mm)
 		except Exception as e:
-			print(f'Failed to detect all 4 Aruco markers with exception: {e}')
+			logger.error(f'Failed to detect all 4 Aruco markers with exception: {e}')
 
 
 		# Optimization: reopen video stream after Aruco calculation, some copypasta:
@@ -306,13 +312,13 @@ class CatVision():
 	def run(self):
 		while self.is_running:
 			if not self.cap.isOpened():
-				print('Live camera capture failed to open, trying again...')
-				self.cap = open_live_capture(self.read_livecam_id)
+				logger.error('Live camera capture failed to open, trying again...')
+				self.cap = self.open_live_capture(self.read_livecam_id)
 			
 			# Capture frame-by-frame
 			ret, frame = self.cap.read()
 			if not ret:
-				print("Can't receive frame (stream end?).  Trying again")
+				logger.warn("Can't receive frame (stream end?).  Trying again")
 				# break # let the loop proceed for now, fix crashing issue?
 				# TODO: Handle reading from files, right now we read forever
 				continue	
@@ -490,7 +496,7 @@ class CatVision():
 
 		# Generate board coordinates for all centroids:
 		if self.transform_img_to_board is not None:
-			print('Found markers')
+			logger.debug('Applying transform from image to board coordinates')
 			for cat in self.cats:
 				cat['centroid_board'] = self.im_x_y_to_board_x_y( cat['centroid'], self.transform_img_to_board )
 			for mouse in self.mice:
