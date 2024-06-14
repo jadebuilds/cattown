@@ -1,8 +1,9 @@
 from abc import ABCMeta, abstractmethod
 from typing import List, Tuple
 import logging
+import math
 
-from ..constants import Tile, Path
+from ..constants import Tile, Path, Point
 from .gcodes import GCode, LinearMove, ArcMove
 from ..custommap import MapConfig, to_coordinates
 
@@ -141,7 +142,7 @@ class ArcSquiggles(MotionStyle):
                 # When we're going in in a straight line we don't need to worry about prepping for the next corner,
                 # so we can feel sure that we can keep going
                 logger.debug("  > next segment is in a straight line, so we can do a full arc")
-                gcodes.append(self._full_arc(
+                gcodes.extend(self._full_arc(
                     start=path_segment[segment_num],
                     end=path_segment[segment_num + 1],
                     clockwise=start_arc_clockwise
@@ -158,21 +159,21 @@ class ArcSquiggles(MotionStyle):
                 
                 next_corner_cross_product = this_direction[0] * next_direction[1] - this_direction[1] * next_direction[0]
                 next_corner_clockwise = (next_corner_cross_product < 0)  # TODO confirm this please
-                print(f"  > next segment is a corner going {"clockwise" if next_corner_clockwise else "counterclockwise"}")
+                logger.debug(f"  > next segment is a corner going {"clockwise" if next_corner_clockwise else "counterclockwise"}")
 
                 if start_arc_clockwise == next_corner_clockwise:
-                    print(f"    > we're starting in the right curl, we'll keep that curl for the whole segment")
+                    logger.debug(f"    > we're starting in the right curl, we'll keep that curl for the whole segment")
                     # if the last arc doesn't match the curl of the corner, one full arc will turn us in the right direction
-                    gcodes.append(self._full_arc(
+                    gcodes.extend(self._full_arc(
                         start=path_segment[segment_num],
                         end=path_segment[segment_num + 1],
                         clockwise=start_arc_clockwise  # we still wanna start this segment respecting the last corner
                     ))
                     last_arc_clockwise = start_arc_clockwise
-                    print(f"    > {gcodes[-1].to_str()}")    
+                    logger.debug(f"    > {gcodes[-1].to_str()}")    
                 
                 elif start_arc_clockwise != next_corner_clockwise:
-                    print(f"    > we'll do a double half arc to flip our curl into the upcoming corner's curl")
+                    logger.debug(f"    > we'll do a double half arc to flip our curl into the upcoming corner's curl")
                     # we want to end this segment with a curl matching the corner we're entering. If e.g. the last arc
                     # was CW and we want to end this segment CW, then we'll need to do two half arcs.
                     gcodes.extend(self._two_half_arcs(
@@ -181,15 +182,15 @@ class ArcSquiggles(MotionStyle):
                         first_arc_clockwise=start_arc_clockwise
                     ))
                     last_arc_clockwise = not start_arc_clockwise  # the second arc is curled opposite the first
-                    print(f"    > {gcodes[-2].to_str()}, {gcodes[-1].to_str()}")    
+                    logger.debug(f"    > {gcodes[-2].to_str()}, {gcodes[-1].to_str()}")    
 
                 # Record state for next segment
                 last_segment_corner = True
         
-        print("final segment!")
+        logger.debug("final segment!")
         # Final segment! We don't care about preparing an upcoming corner (assuming we'll stop), so this can just be a full arc:
         # TODO should we worry about making these paths play nicely with one another? IDK
-        gcodes.append(self._full_arc(
+        gcodes.extend(self._full_arc(
             start=path_segment[-2],
             end=path_segment[-1],
             clockwise=last_arc_clockwise if last_segment_corner else not last_arc_clockwise  # we still care about this tho
@@ -229,19 +230,26 @@ class ArcSquiggles(MotionStyle):
 
         return i,j
 
-    def _full_arc(self, start: Tile, end: Tile, clockwise: bool) -> ArcMove:
+    def _full_arc(self, start: Tile, end: Tile, clockwise: bool) -> Tuple[ArcMove]:
+        """
+        Returns a Tuple[Arc] with one Arc in it. 
+        
+        Note that the type signature is (A) for consistency with _two_half_arcs, 
+        (B) to allow PiecewiseLinearArcSquiggle to use multiple LinearMoves in place of the one
+        ArcMove and keep the method signature the same!
+        """
         dir_vec = self._segment_direction(start, end)
 
         i, j = self._arc_center_offsets(direction=dir_vec, clockwise=clockwise)
 
-        return ArcMove(
+        return (ArcMove(
             x_mm=end[0] * self.map_config.map_grid_spacing_mm + self.map_config.map_x_offset,
             y_mm=end[1] * self.map_config.map_grid_spacing_mm + self.map_config.map_y_offset,
             i_mm= i * self.map_config.map_grid_spacing_mm,
             j_mm = j * self.map_config.map_grid_spacing_mm,
             clockwise=clockwise,
             speed_mm_s=self.speed_mm_s
-        )
+        ),)
     
     def _two_half_arcs(self, start: Tile, end: Tile, first_arc_clockwise: bool) -> Tuple[ArcMove, ArcMove]:
         """
@@ -280,10 +288,85 @@ class ArcSquiggles(MotionStyle):
         )
 
 
+
+class PiecewiseLinearArcSquiggles(ArcSquiggles):
+    """
+    CLASS INHERITANCE BAYBEE LFG
+
+    This child class patches ArcSquiggles to generate piecewise linear arcs, because Klipper takes arcs slowly 
+    for no discernable reason. Curse you Klipper! Some day we'll interpret our own gcode *shakes fist at sky*
+    """
+
+    @staticmethod
+    def _arc_linear_approximation(start: Point, end: Point, i, j, segments=3) -> List[Point]:
+        """ ChatGPT code, seems OK??? but might deserve closer review!!! """
+        center_x = start.x_mm + i
+        center_y = start.y_mm + j
+        R = math.sqrt(i**2 + j**2)
+        
+        theta_0 = math.atan2(-j, -i)
+        theta_1 = math.atan2(end.y_mm - center_y, end.x_mm - center_x)
+        
+        if theta_1 < theta_0:
+            theta_1 += 2 * math.pi
+        
+        points = []
+        delta_theta = (theta_1 - theta_0) / segments
+        
+        for k in range(segments + 1):
+            theta_k = theta_0 + k * delta_theta
+            X_k = center_x + R * math.cos(theta_k)
+            Y_k = center_y + R * math.sin(theta_k)
+            points.append(Point(X_k, Y_k))
+        
+        return points
+
+    def _full_arc(self, start: Tile, end: Tile, clockwise: bool) -> Tuple[ArcMove]:
+
+        start_coords = to_coordinates(start, self.map_config)
+        end_coords = to_coordinates(end, self.map_config)
+
+        dir_vec = self._segment_direction(start, end)
+        i, j = self._arc_center_offsets(direction=dir_vec, clockwise=clockwise)
+        grid_mm = self.map_config.map_grid_spacing_mm
+
+        return (
+            LinearMove.from_point(point, speed_mm_s=self.speed_mm_s)
+            for point in self._arc_linear_approximation(start_coords, end_coords, i * grid_mm, j * grid_mm)
+        )
+
+    def _two_half_arcs(self, start: Tuple[int], end: Tuple[int], first_arc_clockwise: bool) -> Tuple[ArcMove]:
+        dir_vec = self._segment_direction(start, end)
+
+        # The two arcs have different curl (clockwiseness). Note that since I and J are offsets from the
+        # starting position of the arc, which I'm adjusting below when I construct the two arc moves,
+        # I don't have to handle the offset between arcs here / do anything except twiddle the clockwise bit!
+        i_1, j_1 = self._arc_center_offsets(dir_vec, first_arc_clockwise)
+        i_2, j_2 = self._arc_center_offsets(dir_vec, not first_arc_clockwise)
+        # I really wish I had element-wise multiplication like with np arrays or R vectors or whatever here...
+        i_1, i_2, j_1, j_2 = i_1 * 0.5, i_2 * 0.5, j_1 * 0.5, j_2 * 0.5
+
+        midpoint = (start[0] + 0.5 * dir_vec[0], start[1] + 0.5 * dir_vec[1])  # halfway between start to end
+
+        start_coords = to_coordinates(start, self.map_config)
+        midpoint_coords = to_coordinates(midpoint, self.map_config)
+        end_coords = to_coordinates(end, self.map_config)
+
+        grid_mm = self.map_config.map_grid_spacing_mm
+
+        return tuple(
+            LinearMove.from_point(point, speed_mm_s=self.speed_mm_s)
+            for point in self._arc_linear_approximation(start_coords, midpoint_coords, i_1 * grid_mm, j_1 * grid_mm)
+        ) + tuple(
+            LinearMove.from_point(point, speed_mm_s=self.speed_mm_s)
+            for point in self._arc_linear_approximation(midpoint_coords, end_coords, i_2 * grid_mm, j_2 * grid_mm)
+        )
+
+
 if __name__ == "__main__":
+    map_config = MapConfig(10.0, 0.0, 0.0, 50, 50)
     squiggle = ArcSquiggles(
-        map_config=MapConfig(10., 0., 0.),
-        speed_mm_s=10000
+        speed_mm_s=10000, map_config=map_config
     )
     # Points:
     # 3 4 5
