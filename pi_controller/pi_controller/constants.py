@@ -12,8 +12,8 @@ class MapConfig:
 # Open Sauce map is here: https://docs.google.com/spreadsheets/d/1h3TzB2h-GPvKF6A5ktIeTxZr08u3RLS3S5u_wHjHqy4/edit#gid=1701643471
 OPEN_SAUCE_MAP_CONFIG = MapConfig(
     map_grid_spacing_mm=50.0, # 100 mm slot grid, divided by two ("on the slot" vs. "between slots")
-    map_x_offset=-137.0,  # Drive system "home" point is 137mm right and 53 mm up
-    map_y_offset= -53.0,  # from the lower left corner of the board
+    map_x_offset=-122.0,  # Drive system "home" point is 122mm right and 47 mm up of slot 0,0
+    map_y_offset= -47.0,  # from the lower left corner of the board
     grid_size_x=47,  # 6 slots * 4 panels, time two minus one (note that when zero-indexed, as in the Google Sheet, it's 0:46)
     grid_size_y=21,  # 11 slots vertically per panel, times two minus one
 )

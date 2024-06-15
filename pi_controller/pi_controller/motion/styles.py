@@ -20,21 +20,6 @@ class MotionStyle(metaclass=ABCMeta):
         """
 
 
-class SimpleArcSquiggles(MotionStyle):
-    """
-    Okay, I'm including this as an expression of intent (port over from
-    SimpleSquiggleArcPath) but honestly it's probably not even worth the
-    effort, because Klipper arcs are just unexpectedly slow... 
-    or at least we can't figure out how to get it to run them at full 
-    acceleration. Which is annoying! I really wanna have squiggly motion!
-    So I'm going to stick to larger geometric constructions... or at least 
-    see about generating my own piece-wise arc-like squiggles.
-    """
-
-    def generate_motion(self, path_segment: List[Tile]) -> List[GCode]:
-        raise NotImplementedError  # TODO port over from the MotionCommand
-
-
 class SimpleStraightLines(MotionStyle):
 
     def __init__(self, speed_mm_s: float, map_config: MapConfig):
@@ -364,6 +349,8 @@ class PiecewiseLinearArcSquiggles(ArcSquiggles):
 
 
 if __name__ == "__main__":
+    import sys
+    logging.basicConfig(level=logging.DEBUG)
     map_config = MapConfig(10.0, 0.0, 0.0, 50, 50)
     squiggle = ArcSquiggles(
         speed_mm_s=10000, map_config=map_config

@@ -139,9 +139,9 @@ class Toolhead:
         """
         self.path.commit_to_movement(path_segment[-1])  # tell the ToolheadTrajectory not to roll back this segment
         logger.debug(f"Enqueuing motion through {len(path_segment)} tiles: {path_segment}")
-        self.motion_driver.enqueue_motion(
-            self.motion_style.generate_motion(path_segment)
-        )
+        motion = self.motion_style.generate_motion(path_segment)
+        # logger.debug(f"  > gcode moves: {motion}")
+        self.motion_driver.enqueue_motion(motion)
 
     def _path_extended(self):
         """

@@ -31,6 +31,8 @@ class GCode(metaclass=ABCMeta):
         own state or whatever to figure that out if the need to!
         """
 
+    def __repr__(self) -> str:
+        return f"{type(self)}: {vars(self)}" 
 
 class Rotation(Enum):
     """
