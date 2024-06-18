@@ -31,8 +31,9 @@ class CatVision():
 		self.cam_id = None
 		self.display_annotated = display_annotated
 		self.display_in_GUI = False
+		self.display_slowmo_ms = 1 # wait this many ms between frames, 1 at minimum or bad things happen
 		self.show_orientation = True
-		self.show_contour = False
+		self.show_contour = True
 		self.show_bbox = True
 		self.show_centroids = True
 
@@ -43,13 +44,21 @@ class CatVision():
 		# TODO: Calculate these after Aruco transform to put in real units (cm^2)
 		# These will need updating regardless, just guesses based on original test camera and video
 		self.min_cat_contour_area = 10000
+		# self.min_cat_contour_area = 1000
 		self.max_cat_contour_area = 250000
 
 		self.min_mouse_contour_area = 250
 		self.max_mouse_contour_area = 1000
 
+		# maximum distance a cat might move between frames:
 		self.max_same_cat_move_dist_pix = 50
-		# clear memory of possible still cats after 3 minutes:
+		# We check if a moving cat's bounding box overlaps that of a previous still cat's, expanded by this factor,
+		# to see if we should clear out the still cat
+		self.restarted_cat_test_expand_bbox = 1.1
+		# A cat must be moving but within the max frame-to-frame distance for this many frames before
+		# 	it can be a candidate for being a still cat:
+		self.min_frames_tracked_for_still = 4
+		# clear memory of possible still cats after this many seconds:
 		self.still_cat_clear_seconds = 18
 
 		# Still cat settings
@@ -225,7 +234,23 @@ class CatVision():
 		return means, stdevs
 
 
-	def start(self, cam_id=0, filename=None, frame_start=0, output_filename=None, display_in_GUI=False):
+	@staticmethod
+	def check_rect_intersect(rect1, rect2):
+		'''
+		Check for intersection of two bounding box rectangles
+		Where they are given as tuples in the python OpenCV format of lowerleft_x, lowerleft_y, width, height)
+		'''
+		x1, y1, w1, h1 = rect1
+		x2, y2, w2, h2 = rect2
+		# Get centers
+		cx1 = x1 + w1/2; cy1 = y1 + h1/2
+		cx2 = x2 + w2/2; cy2 = y2 + h2/2
+		# if x can be within bounds and y can be within bounds, they intersect
+		return (abs(cx1-cx2) < 0.5*(w1+w2)) and (abs(cy1-cy2) < 0.5*(h1+h2))
+
+
+	def start(self, cam_id=0, filename=None, frame_start=0, output_filename=None, display_in_GUI=False,
+				display_slowmo_ms=1):
 		'''
 		Initialize and start detecting cats
 			filename: Optional can load video from file using filename
@@ -234,6 +259,8 @@ class CatVision():
 			display_in_GUI: If running in XWindows or other GUI, set this to True to display in
 				an openCV window rather than attempt to display directly to the framebuffer as
 				we do on command line.  If running from command line, set this to False.
+			display_slowmo_ms: add a delay of this many milliseconds per frame when displaying
+				only applies to GUI display, not framebuf, and needs to be a minimum of 1
 
 		Currently this runs blocking forever, so needs to be in its own thread
 		'''
@@ -245,6 +272,7 @@ class CatVision():
 
 		self.cam_id = cam_id
 		self.display_in_GUI = display_in_GUI
+		self.display_slowmo_ms = display_slowmo_ms
 
 		if filename is not None:
 			self.cap = cv.VideoCapture( filename )
@@ -391,7 +419,7 @@ class CatVision():
 		# Compare to previous frame's cats:
 		# Store current moving cats, id is arbitrary but might be useful later if things get out of order:
 		# TODO: Add linefit est. direction of facing and anisotropy of cat blob for mouse behavior
-		cur_mcats = [{'id':n, 'contour':cont, 'centroid':cent, 'moving':True, 'timestamp':0} 
+		cur_mcats = [{'id':n, 'contour':cont, 'centroid':cent, 'moving':True, 'frames_tracked':1, 'timestamp':0} 
 						for n, cont, cent in zip(range(len(cat_contours)), cat_contours, cat_centroids)]
 		# Only track moving mice for now:
 		self.mice = [{'id':n, 'contour':cont, 'centroid':cent}
@@ -421,25 +449,41 @@ class CatVision():
 					dists = np.linalg.norm( cur_cents - cent, axis=1 )
 		
 					if dists.min() > self.max_same_cat_move_dist_pix:
-						# We didn't find a previously moving cat close enough to call this the same cat
+						# We didn't find a previously moving cat close enough to call this the same cat,
+						# And it's been tracked for a minimum number of frames
 						# See if the previous moving cat became still
-						possible_stopped_cats.append(cat)
+						if cat['frames_tracked'] >= self.min_frames_tracked_for_still:
+							possible_stopped_cats.append(cat)
+					else:
+						# We found at least one moving cat close enough to be the same cat
+						# Copy over the number of tracked frames from the prev cat and add one
+						idx = np.argmin(dists)
+						cur_mcats[idx]['frames_tracked'] = cat['frames_tracked'] + 1
 
 		# Check for previously still cats that started moving, call these "restarted" cats
 		# Stored as an index into the previous still cats list
 		possible_restarted_cat_idxs = []
 		if any(self.prev_scats) and any(cur_mcats):
-			cur_cents = np.array( [cat['centroid'] for cat in cur_mcats] )
+			# Note bounding rect returns x,y, width, height
+			cur_bboxes = [cv.boundingRect(cat['contour']) for cat in cur_mcats]
 
 			for idx, cat in enumerate(self.prev_scats):
-				cent = np.array(cat['centroid'])
-				dists = np.linalg.norm( cur_cents - cent, axis=1 )
-				if dists.min() < self.max_same_cat_move_dist_pix:
-					# We found a moving cat close to the previously still cat, possibly a restarted cat
-					possible_restarted_cat_idxs.append(idx)
+				# TODO optimization: only calculate previous still cat bbox once and cache it?
+				prev_bbox = list(cv.boundingRect(cat['contour']))
+				# Add some tolerance:
+				# Scale up the bounding box (remember it's a list in order center_x, center_y, width, height)
+				prev_bbox[2] = round(prev_bbox[2] * self.restarted_cat_test_expand_bbox)
+				prev_bbox[3] = round(prev_bbox[3] * self.restarted_cat_test_expand_bbox)
+
+				# Check if any moving cat bbox overlaps with the previous still cat bbox expanded by tolerance
+				for bbox in cur_bboxes:
+					if self.check_rect_intersect(prev_bbox, bbox):
+						possible_restarted_cat_idxs.append(idx)
+						break
+					
 
 		cur_scats = self.prev_scats # start out with same still cat list, drop if they restarted movement
-		if any(possible_restarted_cat_idxs):
+		if possible_restarted_cat_idxs:
 			# TODO: Test region similarity to see if still cat really restarted or other cat just passed close by still cat?
 			# Such a test may falsely say there's still a cat where the still cat was if it moved enough to get on the moving
 			#  cat list but only moved slightly...  So for now just call it restarted without this test
@@ -517,12 +561,12 @@ class CatVision():
 			frame_ct = cv.drawContours(frame, [cat['contour'] for cat in cur_mcats], -1, (0, 255, 0), 2)
 			frame_ct = cv.drawContours(frame, [cat['contour'] for cat in cur_scats], -1, (255, 255, 0), 2)
 			frame_ct = cv.drawContours(frame, mouse_contours, -1, (255, 0, 0), 2)
-		elif self.show_bbox:
+		if self.show_bbox:
 			for c in [cat['contour'] for cat in cur_mcats]:
 				rect = cv.boundingRect(c)
 				x,y,w,h = rect
 				cv.rectangle(frame_ct, (x,y), (x+w,y+h), (0, 255, 0), 2)
-			# Show still cats as yellow:
+			# Show still cats as cyan:
 			for c in [cat['contour'] for cat in cur_scats]:
 				rect = cv.boundingRect(c)
 				x,y,w,h = rect
@@ -553,7 +597,7 @@ class CatVision():
 			# If running in XWindows or other GUI rather than command line
 			cv.imshow('Frame_final', frame_ct)
 			# Need this as well in order to display CV window properly in GUI
-			if cv.waitKey(1) == ord('q'):
+			if cv.waitKey(self.display_slowmo_ms) == ord('q'):
 				return self.cats, self.mice
 		else:
 			# Command line frame buffer display:
@@ -570,11 +614,12 @@ class CatVision():
 
 if __name__ == '__main__':
 	# Test run
-	run_for_seconds = 30
+	run_for_seconds = 120
 	print(f'Testing CatVision and intentionally stopping after {run_for_seconds} seconds:')
 	ccv = CatVision()
 	# Uncomment to play video file in cases where we can't access live camera feeed:
-	ccv.start(filename='/home/chris/cattown/VID_20240525_180301.mp4', display_in_GUI=True)
+	ccv.start(filename=None, display_in_GUI=True)
+	# ccv.start(filename='C:\\Chris\\cattown\\cat_chaos.mp4', display_in_GUI=True, display_slowmo_ms=50)
 	# ccv.start()
 	time.sleep(run_for_seconds)
 	ccv.stop()
