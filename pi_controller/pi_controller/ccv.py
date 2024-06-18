@@ -485,10 +485,11 @@ class CatVision():
 					
 
 		cur_scats = self.prev_scats # start out with same still cat list, drop if they restarted movement
-		if any(possible_restarted_cat_idxs):
+		if possible_restarted_cat_idxs:
 			# TODO: Test region similarity to see if still cat really restarted or other cat just passed close by still cat?
 			# Such a test may falsely say there's still a cat where the still cat was if it moved enough to get on the moving
 			#  cat list but only moved slightly...  So for now just call it restarted without this test
+			print(f'DEBUG: Culling still cat indices: {possible_restarted_cat_idxs}')
 			culled_cur_scats = [cur_scats[idx] for idx in range(len(cur_scats)) if idx not in possible_restarted_cat_idxs]
 			cur_scats = culled_cur_scats
 
