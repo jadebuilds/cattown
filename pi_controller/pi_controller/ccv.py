@@ -244,14 +244,6 @@ class CatVision():
 		cx1 = x1 + w1/2; cy1 = y1 + h1/2
 		cx2 = x2 + w2/2; cy2 = y2 + h2/2
 		# if x can be within bounds and y can be within bounds, they intersect
-		# DEBUG print:
-		print('RECT ISECT TEST:')
-		print(f'x1: {x1}, y1: {y1}, w1: {w1}, h1: {h1}')
-		print(f'x2: {x2}, y2: {y2}, w2: {w2}, h2: {h2}')
-		print(f'cx1-cx2: {cx1-cx2} compare to: {0.5*(w1+w2)}')
-		print(f'cy1-cy2: {cy1-cy2} compare to: {0.5*(h1+h2)}')
-		debug_result = (abs(cx1-cx2) < 0.5*(w1+w2)) and (abs(cy1-cy2) < 0.5*(h1+h2))
-		print(f'Intersected: {debug_result}')
 		return (abs(cx1-cx2) < 0.5*(w1+w2)) and (abs(cy1-cy2) < 0.5*(h1+h2))
 
 
@@ -489,7 +481,6 @@ class CatVision():
 			# TODO: Test region similarity to see if still cat really restarted or other cat just passed close by still cat?
 			# Such a test may falsely say there's still a cat where the still cat was if it moved enough to get on the moving
 			#  cat list but only moved slightly...  So for now just call it restarted without this test
-			print(f'DEBUG: Culling still cat indices: {possible_restarted_cat_idxs}')
 			culled_cur_scats = [cur_scats[idx] for idx in range(len(cur_scats)) if idx not in possible_restarted_cat_idxs]
 			cur_scats = culled_cur_scats
 
