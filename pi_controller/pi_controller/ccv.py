@@ -31,6 +31,7 @@ class CatVision():
 		self.cam_id = None
 		self.display_annotated = display_annotated
 		self.display_in_GUI = False
+		self.display_slowmo_ms = 1 # wait this many ms between frames, 1 at minimum or bad things happen
 		self.show_orientation = True
 		self.show_contour = True
 		self.show_bbox = True
@@ -43,6 +44,7 @@ class CatVision():
 		# TODO: Calculate these after Aruco transform to put in real units (cm^2)
 		# These will need updating regardless, just guesses based on original test camera and video
 		self.min_cat_contour_area = 10000
+		# self.min_cat_contour_area = 1000
 		self.max_cat_contour_area = 250000
 
 		self.min_mouse_contour_area = 250
@@ -247,7 +249,8 @@ class CatVision():
 		return (abs(cx1-cx2) < 0.5*(w1+w2)) and (abs(cy1-cy2) < 0.5*(h1+h2))
 
 
-	def start(self, cam_id=0, filename=None, frame_start=0, output_filename=None, display_in_GUI=False):
+	def start(self, cam_id=0, filename=None, frame_start=0, output_filename=None, display_in_GUI=False,
+				display_slowmo_ms=1):
 		'''
 		Initialize and start detecting cats
 			filename: Optional can load video from file using filename
@@ -256,6 +259,8 @@ class CatVision():
 			display_in_GUI: If running in XWindows or other GUI, set this to True to display in
 				an openCV window rather than attempt to display directly to the framebuffer as
 				we do on command line.  If running from command line, set this to False.
+			display_slowmo_ms: add a delay of this many milliseconds per frame when displaying
+				only applies to GUI display, not framebuf, and needs to be a minimum of 1
 
 		Currently this runs blocking forever, so needs to be in its own thread
 		'''
@@ -267,6 +272,7 @@ class CatVision():
 
 		self.cam_id = cam_id
 		self.display_in_GUI = display_in_GUI
+		self.display_slowmo_ms = display_slowmo_ms
 
 		if filename is not None:
 			self.cap = cv.VideoCapture( filename )
@@ -591,7 +597,7 @@ class CatVision():
 			# If running in XWindows or other GUI rather than command line
 			cv.imshow('Frame_final', frame_ct)
 			# Need this as well in order to display CV window properly in GUI
-			if cv.waitKey(1) == ord('q'):
+			if cv.waitKey(self.display_slowmo_ms) == ord('q'):
 				return self.cats, self.mice
 		else:
 			# Command line frame buffer display:
@@ -613,7 +619,7 @@ if __name__ == '__main__':
 	ccv = CatVision()
 	# Uncomment to play video file in cases where we can't access live camera feeed:
 	ccv.start(filename=None, display_in_GUI=True)
-	# ccv.start(filename='/home/chris/cattown/VID_20240525_180301.mp4', display_in_GUI=True)
+	# ccv.start(filename='C:\\Chris\\cattown\\cat_chaos.mp4', display_in_GUI=True, display_slowmo_ms=50)
 	# ccv.start()
 	time.sleep(run_for_seconds)
 	ccv.stop()
