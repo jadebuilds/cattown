@@ -38,30 +38,37 @@ class CatVision():
 		self.show_centroids = True
 
 		# =================== Algorithm Parameters ===================
+		# ======= Inputs into OpenCV's MOG2 background segmentation model ===========
 		self.detect_shadows = True # slower, but seems to be a lot more accurate
+		# Learning rate, roughly 1 / number of frames we want it to take for a stilled object to become background
+		# When set to -1 the algorithm adaptively choses the learning rate
+		# self.learning_rate = -1
+		self.learning_rate = 1/1000 # seems to work well?
 
-		# minimum and maximum object contour area to be tracked:
+		# minimum and maximum object contour areas to be tracked, for cats & mice
 		# TODO: Calculate these after Aruco transform to put in real units (cm^2)
 		# These will need updating regardless, just guesses based on original test camera and video
-		self.min_cat_contour_area = 10000
-		# self.min_cat_contour_area = 1000
-		self.max_cat_contour_area = 250000
+		self.min_cat_contour_area = 1500
+		self.max_cat_contour_area = 999999999 # no max for now
 
+		# TODO: Tweak this once we know more about our mouse toys and min/max distance from camera in real use
 		self.min_mouse_contour_area = 250
 		self.max_mouse_contour_area = 1000
 
+		# ==== Moving and still cat detection ==========
 		# maximum distance a cat might move between frames:
 		self.max_same_cat_move_dist_pix = 50
 		# We check if a moving cat's bounding box overlaps that of a previous still cat's, expanded by this factor,
 		# to see if we should clear out the still cat
-		self.restarted_cat_test_expand_bbox = 1.1
+		self.restarted_cat_test_expand_bbox = 1.25
 		# A cat must be moving but within the max frame-to-frame distance for this many frames before
 		# 	it can be a candidate for being a still cat:
 		self.min_frames_tracked_for_still = 4
 		# clear memory of possible still cats after this many seconds:
 		self.still_cat_clear_seconds = 18
 
-		# Still cat settings
+		# ===== Still cat region statistics thresholds ========
+		# Triggered when moving cat is no longer detected and we check where it used to be:
 		# If the mean and stdev of each color channel is within 10% of what it was previously, there's still a cat there:
 		# Caveat: watch out for poor lighting or when cat/board contrast is not high
 		self.max_mean_diff_frac = 0.10
@@ -383,7 +390,7 @@ class CatVision():
 		'''
 
 		# Apply background subtraction
-		fg_mask = self.back_sub.apply(frame)
+		fg_mask = self.back_sub.apply(frame, learningRate=self.learning_rate)
 
 		# Background subtract only contains values of 255 = moving foreground, 127 = shadows
 		# So apply threshold of 255 for foreground objects:
