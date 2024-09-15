@@ -93,11 +93,13 @@ class ToolheadTrajectory:
                 # TODO debugging code rm
                 if tile_index != 0 and self._committed_destination in self._tiles[:tile_index]:
                     # This really shouldn't be happening but I believe that it is somehow?
-                    logger.warn("Advancing path past self._committed_destination! wtf")
+                    logger.warn("Request to advance path past self._committed_destination! wtf")
                     logger.warn(f"self: {self}")
                     logger.warn(f"current_tile: {current_tile}")
                     logger.warn(f"self._committed_destination: {self._committed_destination}")
                     logger.warn(f"tile_index: {tile_index}")
+                    logger.info("Let's just assume that's a squiggling bug and skip it")
+                    return
 
 
                 self._tiles = self._tiles[tile_index:]  # leaves current_tile in the list

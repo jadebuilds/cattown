@@ -16,6 +16,7 @@ import threading
 import time
 import traceback
 import sys
+import random
 
 from .custommap import load_from_file
 from .path_finder import PathFinder
@@ -36,7 +37,7 @@ class Game:
             # MockMotionDriver(),
             MoonrakerSocket('cattown001.local'),
             SimpleStraightLines(speed_mm_s=350.0, map_config=OPEN_SAUCE_MAP_CONFIG),
-            #ArcSquiggles(speed_mm_s=400, map_config=OPEN_SAUCE_MAP_CONFIG),
+            #ArcSquiggles(speed_mm_s=500, map_config=OPEN_SAUCE_MAP_CONFIG),
             OPEN_SAUCE_MAP_CONFIG
         )
         self.toolhead_path = ToolheadTrajectory()
@@ -51,9 +52,7 @@ class Game:
 
         self.last_cursor_location: Optional[Tuple[int, int]] = None
 
-        # Event listener and the animation function in the main thread
-        self.fig.canvas.mpl_connect('motion_notify_event', self.on_cursor_move)
-        self.fig.canvas.mpl_connect('button_press_event', self.on_click)
+        # Animation (no input on this one!)
         self.ani = animation.FuncAnimation(self.fig, self.animate, init_func=self._animation_init, interval=100, blit=True)
 
 
@@ -85,14 +84,6 @@ class Game:
         return objects_to_animate
         
 
-    # Event listener for cursor movements
-    # Updates the cat coordinates for the animation library & recalculates path if cat is close. 
-    def on_cursor_move(self, event):
-        if event.inaxes:
-            x, y = round(event.xdata), round(event.ydata)
-            with self.lock:
-                self.last_cursor_location = (x, y)
-
     def on_click(self, event):
         if event.inaxes:
             x, y = round(event.xdata), round(event.ydata)
@@ -111,8 +102,31 @@ class Game:
     def run(self):
         # Start the first set of movements 
         self.toolhead.follow_path(self.toolhead_path)
+        worker_thread = threading.Thread(target=self._run_loop)
+        worker_thread.start()
         plt.show()
 
+    def _run_loop(self):
+        houses = [
+            (5, 17),  # top left
+            (3, 9),  # lower left
+            (19, 17),  # top middle
+            
+            (37, 8),  # lower right house (for a good long horizontal run)
+            
+            (17, 3),  # down into the bottom middle house
+            # I'm tempted to visit the upper right too but we keep dropping the mouse here,
+            # and for autonomous operation that would kinda suck :(
+        ]
+        tile_index = 0
+        while True:
+            logger.info(f"Making a move to {houses[tile_index]}")
+            new_path_segment = self.path_finder.go_to_coords(self.toolhead.get_current_tile(), houses[tile_index])
+            self.toolhead_path.extend(new_path_segment)
+            # loop around
+            tile_index = (tile_index + 1) % len(houses)
+            self.toolhead.paused_or_pausing.wait()  # wait until done moving to push new content
+            time.sleep(5.0 + random.random() * 15)  # wait a bit before moving again
 
 def main():
     try:
