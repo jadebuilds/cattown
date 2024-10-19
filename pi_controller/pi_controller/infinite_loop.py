@@ -1,6 +1,7 @@
-# manual_control.py
+# infinite_loop.py
 #
-# "Fork" of map_display.py which uses the cursor to drive the mouse.
+# "Fork" again of manual_control.py, this time just running around the map
+# in an infinite loop between pre-defined waypoints.
 #
 # Author: Jade
 
