@@ -1,0 +1,15 @@
+{
+    "files.associations": {
+        "__locale": "cpp"
+    },
+    "[python]": {
+        "diffEditor.ignoreTrimWhitespace": false,
+        "gitlens.codeLens.symbolScopes": [
+            "!Module"
+        ],
+        "editor.formatOnType": true,
+        "editor.formatOnSave": true,
+        "editor.wordBasedSuggestions": "off",
+        "editor.defaultFormatter": "charliermarsh.ruff"
+    }
+}
