@@ -2,12 +2,14 @@
 Serves a frontend using nicegui that allows us to run the
 """
 
+from typing import Optional
 import logging
 from nicegui import ui
 import queue
 import threading
 
 from ..ccv import CatVision
+from .backend import Game
 
 # --------------------------------------------------------------------------- #
 # Set up logging text area
@@ -40,9 +42,27 @@ log_text_area = ui.log(max_lines=20).classes("w-full h-100")
 # Control buttons
 # --------------------------------------------------------------------------- #
 
+game: Optional[Game] = None
+
+
+def start():
+    global game
+    if not game:
+        logger.info("Starting the game!")
+        game = Game()
+        game.run()
+
+
+def stop():
+    global game
+    if game:
+        logger.info("Stopping the game...")
+        game.stop()
+
+
 # Example buttons to generate log entries
-ui.button("Start!", on_click=lambda: logger.info("Starting autonomous thingie"))
-ui.button("Stop", on_click=lambda: logger.warning("This is a warning message"))
+ui.button("Start!", on_click=start)
+ui.button("Stop", on_click=stop)
 
 
 # --------------------------------------------------------------------------- #

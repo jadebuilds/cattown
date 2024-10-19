@@ -3,29 +3,32 @@
 # This is terrible coding practice but we're time constrained and so
 # fuck it we're gonna live dangerously lol. I'm "fork"ing yet again
 # from infinite_loop.py, this time to pull out the matplotlib display
-
+# and provide something that can be run from the web frontend.
 #
 # Author: Jade
 
 from typing import Optional, Tuple
 import logging
-import colorlog
 import threading
 import time
-import traceback
-import sys
 import random
+from enum import Enum
 
-from ..custommap import load_from_file
 from ..path_finder import PathFinder
 from ..toolhead_trajectory import ToolheadTrajectory
 from ..motion.toolhead import Toolhead
 from ..motion.moonraker import MoonrakerSocket
-from ..motion.mock_driver import MockMotionDriver
 from ..motion.styles import SimpleStraightLines, ArcSquiggles
 from ..constants import OPEN_SAUCE_MAP_CONFIG
 
 logger = logging.getLogger(__name__)
+
+
+class GameState(Enum):
+    # TODO use me!!!
+
+    TOODLING_AROUND = 1  # cruise between pre-defined waypoints
+    RUNNING_AWAY = 2  # run to the nearest
 
 
 class Game:
@@ -40,14 +43,21 @@ class Game:
             OPEN_SAUCE_MAP_CONFIG,
         )
         self.toolhead_path = ToolheadTrajectory()
-
         self.last_cursor_location: Optional[Tuple[int, int]] = None
+        self.worker_thread: Optional[threading.Thread] = None
+        self.should_stop = threading.Event()
 
     def run(self):
         # Start the first set of movements
+        self.should_stop.clear()
         self.toolhead.follow_path(self.toolhead_path)
-        worker_thread = threading.Thread(target=self._run_loop)
-        worker_thread.start()
+        self.worker_thread = threading.Thread(target=self._run_loop)
+        self.worker_thread.start()
+
+    def stop(self):
+        if self.worker_thread:
+            self.should_stop.set()
+            self.worker_thread.join()
 
     def _run_loop(self):
         houses = [
@@ -59,7 +69,7 @@ class Game:
             # and for autonomous operation that would kinda suck :(
         ]
         tile_index = 0
-        while True:
+        while not self.should_stop.is_set():
             logger.info(f"Making a move to {houses[tile_index]}")
             new_path_segment = self.path_finder.go_to_coords(
                 self.toolhead.get_current_tile(), houses[tile_index]
