@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 class CatVision():
-	def __init__(self, board_width_mm=None, board_height_mm=None, display_annotated=True):
+	def __init__(self, board_width_mm=None, board_height_mm=None, display_annotated=True, callback=None):
 
 		if not board_width_mm:
 			# TODO: Rough hardcoded values for now
@@ -36,6 +36,8 @@ class CatVision():
 		self.show_contour = True
 		self.show_bbox = True
 		self.show_centroids = True
+
+		self.update_callback = callback
 
 		# =================== Algorithm Parameters ===================
 		# ======= Inputs into OpenCV's MOG2 background segmentation model ===========
@@ -87,9 +89,33 @@ class CatVision():
 		# Rough guess for millimeters per pixel scale just using average of top and bottom board widths
 		# (Actual scale will vary with position in image if there is any perspective "keystoning")
 		self.rough_pix_to_mm = None
-
+		''' 
+  		Format of cats dictionary:
+    		id : unique id for each currently detected cat, can be reused - TODO: Are ids duplicated between still cats and moving cats?
+      		contour: openCV contour opbject, list of image space coordinates for cat's contour
+		centroid: centroid of cat in image coordinates
+  		centroid_board: centroid of cat in board coordinates (mm x , mm y ?)
+  		moving: whether cat has been moving or is still
+    		frames_tracked: number of frames we hae been tracking the cat
+      		timestamp: for still cats only, the time stamp of when they were last seen moving.  Currently moving cats have this set to zero
+    		'''
 		self.cats = [] # Both moving and still cats
+		'''
+  		Format of mouse dictionary:
+    		id : unique id for each currently detected cat
+      		contour : same idea as contour for mouse
+		centroid : image coordinates centroid for mouse
+		centroid_board: centroid of mouse in board coordinates (mm x , mm y ?)
+    		'''		
 		self.mice = [] # Only moving mice
+
+		'''
+  		Externally-facing cat and mouse dicts that only contain the necessary information
+    		cat board centroids, cat id, moving, timestamp of still cat if still (zero if not still)
+      		'''
+		self.cats_external = []
+		self.mice_external = []
+		
 		self.prev_mcats = [] # previous frame's moving cats
 		self.prev_scats = [] # previous frame's still cats
 
@@ -359,8 +385,11 @@ class CatVision():
 				continue	
 
 			cats, mice = self.find_cats(frame)
-			# TODO: Send protobuf message here with cat and mouse info?
-			# TODO: Copy these into queue
+			self.cats_external = [{'id':cat['id'], 'centroid':cat['centroid_board'], 'still_since_timestamp':cat['timestamp'], 'moving':cat['moving']}
+					     	for cat in cats]
+			self.mice_external = [{'id':mouse['id'], 'centroid':mouse['centroid_board']}
+					     	for mouse in mice]
+			self.update_callback(self.cats_external, self.mice_external)
 
 		# If we're not running anymore, close up
 		if self.cap is not None:
@@ -386,7 +415,6 @@ class CatVision():
 		'''
 		Does the actual cat finding and coordinate transforms
 		For now just updates member vars and puts a timestamp for the latest calculation
-		TODO: Send gcode messages on each frame update?
 		'''
 
 		# Apply background subtraction
