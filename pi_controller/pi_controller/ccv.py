@@ -576,17 +576,18 @@ class CatVision():
 		# Generate board coordinates for all centroids:
 		if self.transform_img_to_board is not None:
 			logger.debug('Applying transform from image to board coordinates')
-			for cat in self.cats:
-				cat['centroid_board'] = self.im_x_y_to_board_x_y( cat['centroid'], self.transform_img_to_board )
-			for mouse in self.mice:
-				mouse['centroid_board'] = self.im_x_y_to_board_x_y( mouse['centroid'], self.transform_img_to_board )
-
-
+			self.cats = [ cat.update{'centroid_board': self.im_x_y_to_board_x_y( cat['centroid'], self.transform_img_to_board )}
+					for cat in self.cats ]
+			self.mice = [ mouse.update{'centroid_board': self.im_x_y_to_board_x_y( mouse['centroid'], self.transform_img_to_board )}
+					for mouse in self.mice ]
+		else:
+			self.cats = [ cat.update{'centroid_board': None} for cat in self.cats ]
+			self.mice = [ cat.update{'centroid_board': None} for mouse in mouse.cats ]
 		# We're done if we're not displaying an annotated image
 		# TODO: We're skipping the direction vector calculation by exiting out here.  We may want to send that out.
 		#       If so it's calculated below under show_orientation
-		# if not self.display_annotated:
-		return self.cats, self.mice
+		if not self.display_annotated:
+			return self.cats, self.mice
 
 		# initialize annotated frame:
 		frame_ct = frame.copy()
