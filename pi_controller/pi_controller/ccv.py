@@ -385,11 +385,13 @@ class CatVision():
 				continue	
 
 			cats, mice = self.find_cats(frame)
+			# TODO: This should not be returning [None] but sometimes it is
+			cats = [c for c in cats if c is not None]
+			mice = [m for m in mice if m is not None]
 			self.cats_external = [{'id':cat['id'], 'centroid':cat['centroid_board'], 'still_since_timestamp':cat['timestamp'], 'moving':cat['moving']}
 					     	for cat in cats]
 			self.mice_external = [{'id':mouse['id'], 'centroid':mouse['centroid_board']}
 					     	for mouse in mice]
-			
 			if self.update_callback:
 				self.update_callback(self.cats_external, self.mice_external)
 
