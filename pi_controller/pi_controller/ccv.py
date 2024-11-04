@@ -585,8 +585,8 @@ class CatVision():
 		# We're done if we're not displaying an annotated image
 		# TODO: We're skipping the direction vector calculation by exiting out here.  We may want to send that out.
 		#       If so it's calculated below under show_orientation
-		if not self.display_annotated:
-			return self.cats, self.mice
+		# if not self.display_annotated:
+		return self.cats, self.mice
 
 		# initialize annotated frame:
 		frame_ct = frame.copy()
@@ -653,8 +653,8 @@ if __name__ == '__main__':
 	print(f'Testing CatVision and intentionally stopping after {run_for_seconds} seconds:')
 	ccv = CatVision()
 	# Uncomment to play video file in cases where we can't access live camera feeed:
-	ccv.start(filename=None, display_in_GUI=True)
-	# ccv.start(filename='C:\\Chris\\cattown\\cat_chaos.mp4', display_in_GUI=True, display_slowmo_ms=50)
+	# ccv.start(filename=None, display_in_GUI=True)
+	ccv.start(filename='/home/csarantos/Documents/2024-03-22 first trial.mov', display_in_GUI=True, display_slowmo_ms=50)
 	# ccv.start()
 	time.sleep(run_for_seconds)
 	ccv.stop()
