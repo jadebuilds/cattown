@@ -392,6 +392,11 @@ class CatVision():
 					     	for cat in cats]
 			self.mice_external = [{'id':mouse['id'], 'centroid':mouse['centroid_board']}
 					     	for mouse in mice]
+			print('Debug cats:')
+			print(cats)
+			if cats:
+				print('cat centroids :')
+				print([c['centroid_board'] for c in cats])
 			if self.update_callback:
 				self.update_callback(self.cats_external, self.mice_external)
 
