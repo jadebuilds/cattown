@@ -7,12 +7,10 @@
 #
 # Author: Jade
 
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Dict, List
 import logging
 import threading
 import time
-import random
-from enum import Enum
 
 from ..path_finder import PathFinder
 from ..toolhead_trajectory import ToolheadTrajectory
@@ -20,15 +18,31 @@ from ..motion.toolhead import Toolhead
 from ..motion.moonraker import MoonrakerSocket
 from ..motion.styles import SimpleStraightLines, ArcSquiggles
 from ..constants import OPEN_SAUCE_MAP_CONFIG
+from .mouse import Mouse, MouseState
+
+from ..ccv import CatVision
+
 
 logger = logging.getLogger(__name__)
 
 
-class GameState(Enum):
-    # TODO use me!!!
+"""
+For this "minimum viable autonomy" approach we'll start out by
+putting mice in known starting locations. Our first move will
+be to pick them up and head 
+"""
+MOUSE_STARTING_LOCATIONS = [
+    (6, 15),  # in the middle of the left upper ramp (between the two mouseholes)
+    (32, 15),  # middle of the right upper ramp (panel 3) (between mouse holes)
+]
 
-    TOODLING_AROUND = 1  # cruise between pre-defined waypoints
-    RUNNING_AWAY = 2  # run to the nearest
+MOUSE_HOUSES = [
+    (5, 17),  # top left
+    (3, 9),  # lower left
+    (19, 17),  # top middle
+    # (37, 8),  # lower right house NOT IN OPERATION right now (making weird clunking sounds @ Doreen's)
+    (17, 3),  # down into the bottom middle house
+]
 
 
 class Game:
@@ -47,12 +61,28 @@ class Game:
         self.worker_thread: Optional[threading.Thread] = None
         self.should_stop = threading.Event()
 
+        self.ccv = CatVision(callback=self._update_vision)
+        self.cats_last_seen_lock = threading.Lock()
+        self.cats_last_seen: List[Dict] = None
+
+        self.mice = [
+            Mouse(
+                location=starting_location,
+                houses=MOUSE_HOUSES,
+                path_finder=self.path_finder,
+            )
+            for starting_location in MOUSE_STARTING_LOCATIONS
+        ]
+        self.active_mouse_index = 0
+
     def run(self):
         # Start the first set of movements
         self.should_stop.clear()
         self.toolhead.follow_path(self.toolhead_path)
-        self.worker_thread = threading.Thread(target=self._run_loop)
-        self.worker_thread.start()
+        self.mouse_thread = threading.Thread(target=self._run_loop)
+        self.mouse_thread.start()
+
+        self.ccv.start()  # start background thread doing webcam capture
 
     def stop(self):
         if self.worker_thread:
@@ -60,22 +90,36 @@ class Game:
             self.worker_thread.join()
 
     def _run_loop(self):
-        houses = [
-            (5, 17),  # top left
-            (3, 9),  # lower left
-            (19, 17),  # top middle
-            (17, 3),  # down into the bottom middle house
-            # I'm tempted to visit the upper right too but we keep dropping the mouse here,
-            # and for autonomous operation that would kinda suck :(
-        ]
-        tile_index = 0
+        """
+        Background thread: Run the mouse around
+        """
+
         while not self.should_stop.is_set():
-            logger.info(f"Making a move to {houses[tile_index]}")
-            new_path_segment = self.path_finder.go_to_coords(
-                self.toolhead.get_current_tile(), houses[tile_index]
-            )
-            self.toolhead_path.extend(new_path_segment)
-            # loop around
-            tile_index = (tile_index + 1) % len(houses)
-            self.toolhead.paused_or_pausing.wait()  # wait until done moving to push new content
-            time.sleep(5.0 + random.random() * 15)  # wait a bit before moving again
+            logger.info("Todo move the mouse around")
+
+            active_mouse = self.mice[self.active_mouse_index]
+
+            cat_distance = self._distance_from_cat(self.cat)
+            new_path_segment = active_mouse.move(cat_distance=cat_distance)
+            if new_path_segment:
+                self.toolhead_path.extend(new_path_segment)
+                self.toolhead.paused_or_pausing.wait()
+
+            # TODO switch mice!!!!
+
+    def _update_vision(self, cats: List[Dict], mice: List[Dict]):
+        """
+        Callback invoked within the CatVision.run()
+        """
+        with self.cats_last_seen_lock:
+            self.cats_last_seen = cats
+        time.sleep(0.1)  # does this make sense? just to be sure we don't hog the CPU
+
+    def _distance_from_cat(self) -> float:
+        """
+        Accesses cats_last_seen to figure out how far the nearest cat is.
+        """
+        with self.cats_last_seen_lock:
+            self.cats_last_seen
+
+        raise NotImplementedError
