@@ -392,11 +392,10 @@ class CatVision():
 					     	for cat in cats]
 			self.mice_external = [{'id':mouse['id'], 'centroid':mouse['centroid_board']}
 					     	for mouse in mice]
-			print('Debug cats:')
-			print(cats)
-			if cats:
-				print('cat centroids :')
-				print([c['centroid_board'] for c in cats])
+			# Uncomment to print debug board coordinates:
+			# if cats:
+			#	print('cat centroids :')
+			#	print([c['centroid'] for c in self.cats_external])
 			if self.update_callback:
 				self.update_callback(self.cats_external, self.mice_external)
 
@@ -585,13 +584,15 @@ class CatVision():
 		# Generate board coordinates for all centroids:
 		if self.transform_img_to_board is not None:
 			logger.debug('Applying transform from image to board coordinates')
-			self.cats = [ cat.update({'centroid_board': self.im_x_y_to_board_x_y( cat['centroid'], self.transform_img_to_board )})
-					for cat in self.cats ]
-			self.mice = [ mouse.update({'centroid_board': self.im_x_y_to_board_x_y( mouse['centroid'], self.transform_img_to_board )})
-					for mouse in self.mice ]
+			for cat in self.cats:
+				cat.update({'centroid_board': self.im_x_y_to_board_x_y( cat['centroid'], self.transform_img_to_board )})
+			for mouse in self.mice:
+				mouse.update({'centroid_board': self.im_x_y_to_board_x_y( mouse['centroid'], self.transform_img_to_board )})
 		else:
-			self.cats = [ cat.update({'centroid_board': None}) for cat in self.cats ]
-			self.mice = [ mouse.update({'centroid_board': None}) for mouse in self.mice ]
+			for cat in self.cats:
+				cat.update({'centroid_board': None})
+			for mouse in self.mice:
+				mouse.update({'centroid_board': None})
 		# We're done if we're not displaying an annotated image
 		# TODO: We're skipping the direction vector calculation by exiting out here.  We may want to send that out.
 		#       If so it's calculated below under show_orientation
@@ -659,6 +660,7 @@ class CatVision():
 
 if __name__ == '__main__':
 	# Test run
+	# Run for seconds
 	run_for_seconds = 120
 	print(f'Testing CatVision and intentionally stopping after {run_for_seconds} seconds:')
 	ccv = CatVision()
@@ -666,5 +668,5 @@ if __name__ == '__main__':
 	ccv.start(filename=None, display_in_GUI=False)
 	# ccv.start(filename='/home/csarantos/Documents/2024-03-22 first trial.mov', display_in_GUI=True, display_slowmo_ms=50)
 	# ccv.start()
-	time.sleep(run_for_seconds)
-	ccv.stop()
+	# time.sleep(run_for_seconds)
+	# ccv.stop()
