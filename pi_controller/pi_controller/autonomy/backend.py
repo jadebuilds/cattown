@@ -36,12 +36,15 @@ MOUSE_STARTING_LOCATIONS = [
     (32, 15),  # middle of the right upper ramp (panel 3) (between mouse holes)
 ]
 
+# Note that the infinite_loop steers to the entrance of the house,
+# whereas here we're navigating to the very back of the house --
+# which is why their coordinates are different
 MOUSE_HOUSES = [
-    (5, 17),  # top left
-    (3, 9),  # lower left
-    (19, 17),  # top middle
+    (7, 17),  # top left
+    (5, 9),  # lower left
+    (21, 17),  # top middle
     # (37, 8),  # lower right house NOT IN OPERATION right now (making weird clunking sounds @ Doreen's)
-    (17, 3),  # down into the bottom middle house
+    (19, 3),  # down into the bottom middle house
 ]
 
 
