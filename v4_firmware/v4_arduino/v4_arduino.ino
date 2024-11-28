@@ -19,42 +19,35 @@
 // todo should these be #defines?
 const int DEBUG_UART_BAUD = 115200;
 
-// I'm going fairly slowly for the moment because I expect to introduce discontinuities
-// into the PWM output each time we change the PWM duty cycle (I keep disabling and re-enabling
-// those channels)
-const int MAIN_LOOP_PERIOD_MILLIS = 100;  // used in a delay() call in each loop()
+// Pulling this up 
+const int MAIN_LOOP_PERIOD_MILLIS = 1;  // used in a delay() call in each loop()
 
-const int PULLEY_DIAMETER_UM = 20000;  // 20 mm diameter pulley
-const int PULLEY_PERIMETER_UM = 62832;  // 20 mm * pi
+const int PULLEY_DIAMETER_UM = 25000;  // 25 mm diameter pulley
+const int PULLEY_PERIMETER_UM = 78540;  // 25 mm * pi
 
 // How fast should a mouse accelerate? For my first pass I'll try 1G (9/8 m/s^2).
-// With a 25 mm pulley diameter that works out to 
-// dw/dt = a/r = (9.8 m/s^2) / (0.0125 m) * (60 s / 1 min) * (1 rev / 2π) = 7480 rpm/s
-// So basically I'll allow the motor to ramp up to full over one second.
-// Actually thinking about it I'm gonna use the Nice Round Number of 8000 rpm/s,
-// which should work out to 1.07 G (very close) and invites a world of pleasant integral
-// calculations. Also constitutes the motor spinning up fully over half a second which is
-// nicne and round to think about.
-
-// Note that I might move away from RPM as a measure of rotational speed but for now
-// it seems both nicely legible and large enough to be pleasantly integral. So we're gonna
-// stick with it for the moment and see how it feels.
-//const int MAX_ACCEL_RPM_PER_S = 8000;
-
-// Actually I want to accelerate much slower than that for testing. Let's do this (todo remove me)
-const int MAX_ACCEL_RPM_PER_S = 200;
+// With a 20 cm pulley diameter that works out to 
+// dw/dt = a/r = (9.8 m/s^2) / (0.2 m) * (60 s / 1 min) * (1 rev / 2π) = 470 rpm/s
+// So basically I'll allow the motor to ramp up to full over half a second.
+// However the big pulleys make us skip steps and so I'm not sure if we can actually
+// move that fast right now... so I'm gonna keep this fairly low and we'll see if 
+// we can push it up to 470 later.
+// 
+// Note that this value is shifted left 16 bits to sit in the left half of the
+// integer (the integral part of the 15Q16 number).
+const int MAX_ACCEL_RPM_PER_S_15Q16 = (600) << 16;
 
 // In testing I'm finding that I can't get my steppers to spin faster than this without 
 // starting to buzz and skip steps. Some work to do here around tuning SpreadCycle chopping
 // to try to get it to run faster (or possibly checking out some of the other TMC chips, 2130
 // I think?, that have a dedicated high-speed mode??)
-const int MAX_RPM = 300;
-const int MAX_NEG_RPM = -300;
+const int MAX_RPM_15Q16 = (600) << 16;
+const int MAX_NEG_RPM_15Q16 = (-600) << 16;
 
 // Leaving at the default number of microsteps for the moment.
 const int MICROSTEPS = 8;
 
-// For 8 microsteps and a 20 mm pulley diameter, this is equal to about 39.27 um. That's too low
+// For 8 microsteps and a 25 mm pulley diameter, this is equal to about 49.09 um. That's too low
 // and introduces some rounding error. However when the pulley gets bigger it should be just fine
 const int STRING_UM_PER_PULSE = PULLEY_PERIMETER_UM / (MICROSTEPS * 200);
 
@@ -174,20 +167,27 @@ enum RotationalDirection { CW, CCW };
 
 struct MotorState {
   TMC2209Stepper & driver;
-  int32_t targetRpm;
   // I'm sticking to integer math for the moment since I don't know fixed point (yet! eek) and 
-  // the Due doesn't have an FPU so floating point math is slow as shit. The "string length change per pulse" 
-  // calculation is always going to be approximate / non-integral because it involves pi; so to avoid drift
-  // I'm going to track motor state as encoder pulse count (definitely integral, 12/rotation) and redo the string
-  // length calculation each time I need it (to avoid accumulating error).
+  // the Due doesn't have an FPU so floating point math is slow as shit. 
+  // 
+  // That means that we need to use numbers that will tend to be fairly large, though never larger than 2^32.
+  // I'm using micrometers for distance; the largest distance in the system is about 9' right now, which is 
+  // 2^22, leaving 10 bits of headroom for math. However I can't think of a satisfying rotational speed unit
+  // which doesn't sound super dumb -- millidegrees per second? what the fuck even is that? so I'm just gonna
+  // bite the bullet and try making it 16Q16, where the second half is considered fractional.
+  // I hope I understand this enough to make it work... we'll see...
+  int32_t targetRpm_15q16;
+  // The "string length change per pulse" calculation is always going to be approximate / non-integral 
+  // because it involves pi; so to avoid drift I'm going to track motor state as encoder pulse count (definitely integral, 12/rotation) 
+  // and redo the string length calculation each time I need it (to avoid accumulating error).
   // Note that pulse count is signed so that it can go negative to account for turning "the other direction".
   // 
-  // Sign convention: ** positive is clockwise, negative is counterclockwise **
+  // Sign convention: ** positive is clockwise, negative is counterclockwise ** (applied in the ISR!)
   int encoderPulseCount;
   // Similarly, calibration is done in terms of pulse count so I can do apples to apples. We'll figure
   // out how exactly to calibrate later...
   bool calibrated;
-  int pulseCountZeroStringLength;
+  uint startingLengthPulseCount;
   RotationalDirection direction;  // actual direction set by control pin (should get synchronized with targetRpm)
   // TODO do I store measurements of actual inst speed?
 };
@@ -197,27 +197,27 @@ TMC2209Stepper driver_0(&motorPins[0].uart, R_SENSE, motorPins[0].driverAddress)
 TMC2209Stepper driver_1(&motorPins[1].uart, R_SENSE, motorPins[1].driverAddress);
 
 // TODO implement calibration routine!!!!!
-// For the moment I'm going to assume that we start with the carriage in the exact middle of the platform.
-// This means we'll have to do it by hand -- power the thing off (or at least release motor control somehow)
+// For the moment I'm going to assume that we start with the carriage at the point we've marked at the 
+// bottom of the frame, which is 48" on the left motor and 68.5" on the right.
+// This means we'll have to calibrate by hand -- power the thing off (or at least release motor control somehow)
 // and spin the pulleys manually until the carriage is correctly positioned. (The stabilizer will probably
 // fuck this up when added and we'll probably need to change the routine pretty quickly. Hopefully it gives
 // us at least a known starting position, like pulls the carriage down to the bottom).
 //
-// So I'm just hard-coding the "zero string length" pulse count. Here's my math:
-// String length: sqrt((4 feet / 2)^2 + (82" / 2)^2) = 47.5" = 1206.7 mm
-// The stepper should give us 1600 pulses per rotation, and every rotation is currently
 // Note that this does not account for a bunch of things, such as the width of the 2x4s and the offset of 
 // the motors, and I'll need to do a more careful geometric accounting some time quite soon.
-int HALF_STRING_LENGTH_UM = 4 * 12 * 25400;
 MotorState motorState[2] = {
-  {driver_0, 0, 0, true, -1 * 200 * MICROSTEPS * HALF_STRING_LENGTH_UM / PULLEY_PERIMETER_UM, CW},
-  {driver_1, 0, 0, true, -1 * 200 * MICROSTEPS * HALF_STRING_LENGTH_UM / PULLEY_PERIMETER_UM, CW},
+  // 48 inches * 25400 um/inch * 200 fullsteps/revolution * 8 step pulses/fullstep / ((20000 * pi) um/revolution) == # pulses for 48" length
+  {driver_0, 0, 0, true, 48 * (25400 * 200 * MICROSTEPS / PULLEY_PERIMETER_UM), CW},
+  // This is actually 68.25 inches but I'm defining this as integers so idk (temporary code anyway).
+  // Also note that the parentheses here are to avoid getting close to overflow -- there's an intermediate
+  // term here before we divide by 
+  {driver_1, 0, 0, true, 68 * (25400 * 200 * MICROSTEPS / PULLEY_PERIMETER_UM), CW},
 };
 
 // Some local state declared statically
-int stringLength_mm_q8 [2];  // in millimeters, Q24.8
-int stringLength_um[2];  // in inches, converted for the LUT (TODO redo the LUT in metric?)
-int stringLength_in[2];  // in inches, converted for the LUT (TODO redo the LUT in metric?)
+uint stringLength_um[2];  // in inches, converted for the LUT (TODO redo the LUT in metric?)
+uint stringLength_in[2];  // in inches, converted for the LUT (TODO redo the LUT in metric?)
 int x_in;
 int y_in;
 
@@ -240,9 +240,18 @@ uint32_t temp_freq_readout[2] = { 0, 0 };
 // Utility function to occasionally read out what's going on.
 bool send_state_debug_message(void * /* unused */) { // n.b. function signature is set by the timer library
   char buffer[100]; // Ensure this buffer is large enough for the resulting string
-  snprintf(buffer, sizeof(buffer), "Motor 0: %d RPM / %d Hz; Motor 1: %d RPM / %d Hz; L1: %d, L2: %d, x: %d, y: %d", motorState[0].targetRpm, temp_freq_readout[0], motorState[1].targetRpm, temp_freq_readout[1], stringLength_in[0], stringLength_in[1], x_in, y_in);
+  // snprintf(buffer, sizeof(buffer), "Motor 0: %d RPM / %d Hz; Motor 1: %d RPM / %d Hz; L1: %u, L2: %u, x: %u, y: %u", 
+  //     motorState[0].targetRpm_15q16 >> 16, temp_freq_readout[0], 
+  //     motorState[1].targetRpm_15q16 >> 16, temp_freq_readout[1], 
+  //     stringLength_in[0], stringLength_in[1], 
+  //     x_in, y_in
+  // );
+  snprintf(buffer, sizeof(buffer), "Motor 0: %d RPM / %d Hz; Motor 1: %d RPM / %d Hz; L1: %u, L2: %u", 
+      motorState[0].targetRpm_15q16 >> 16, temp_freq_readout[0], 
+      motorState[1].targetRpm_15q16 >> 16, temp_freq_readout[1], 
+      stringLength_in[0], stringLength_in[1]
+  );
   Serial.println(buffer);
-  snprintf(buffer, sizeof(buffer), "Target RPM: Motor 0: %d; Motor 1: %d", motorState[0].targetRpm, motorState[1].targetRpm);
   return true;
 }
 
@@ -386,23 +395,23 @@ void loop() {
   // Left and up "feel" more like retracting to me, right and down "feel" more like extending,
   // so that's how I've programmed it. We can always futz with this later.
 
-  uint32_t accel = (MAX_ACCEL_RPM_PER_S * MAIN_LOOP_PERIOD_MILLIS) / 1000;
+  uint32_t accel_this_loop = MAX_ACCEL_RPM_PER_S_15Q16 * MAIN_LOOP_PERIOD_MILLIS / 1000;
 
   if (modeDirect) {
     if (joystickState.left) {
-      motorState[0].targetRpm -= accel;  // mouse go fast :shrug:
+      motorState[0].targetRpm_15q16 -= accel_this_loop;
     } else if (joystickState.right) {
-      motorState[0].targetRpm += accel;
+      motorState[0].targetRpm_15q16 += accel_this_loop;
     } else {
-      motorState[0].targetRpm += decrease_to_zero(motorState[0].targetRpm, accel);
+      motorState[0].targetRpm_15q16 += decrease_to_zero(motorState[0].targetRpm_15q16, accel_this_loop * 2);
     }
 
     if (joystickState.up) {
-      motorState[1].targetRpm -= accel;
+      motorState[1].targetRpm_15q16 += accel_this_loop;
     } else if (joystickState.down) {
-      motorState[1].targetRpm += accel;
+      motorState[1].targetRpm_15q16 -= accel_this_loop;
     } else {
-      motorState[1].targetRpm += decrease_to_zero(motorState[1].targetRpm, accel);
+      motorState[1].targetRpm_15q16 += decrease_to_zero(motorState[1].targetRpm_15q16, accel_this_loop * 2);
     }
   }
 
@@ -412,16 +421,16 @@ void loop() {
   // and then worry about interpolation later.
 
   // // TODO call out to a calibration routine as appropriate (probably a little FSM?)
-  stringLength_um[0] = (motorState[0].encoderPulseCount - motorState[0].pulseCountZeroStringLength) * STRING_UM_PER_PULSE;
-  stringLength_um[1] = (motorState[1].encoderPulseCount - motorState[1].pulseCountZeroStringLength) * STRING_UM_PER_PULSE;
+  stringLength_um[0] = (motorState[0].encoderPulseCount + motorState[0].startingLengthPulseCount) * STRING_UM_PER_PULSE;
+  stringLength_um[1] = (motorState[1].encoderPulseCount + motorState[1].startingLengthPulseCount) * STRING_UM_PER_PULSE;
 
   stringLength_in[0] = stringLength_um[0] / 25400;  // These are integers, so rounding down to the nearest inch
   stringLength_in[1] = stringLength_um[1] / 25400;
 
-  LocalKinematics kinematics = lookupTable[stringLength_in[1]][stringLength_in[0]];
+  // LocalKinematics kinematics = lookupTable[stringLength_in[1]][stringLength_in[0]];
 
-  x_in = (int) kinematics.x;
-  y_in = (int) kinematics.y;
+  // x_in = (int) kinematics.x;
+  // y_in = (int) kinematics.y;
 
   if (modeManual) {
 
@@ -447,14 +456,14 @@ void loop() {
 
   // todo
   for (int i = 0; i < 2; i++) {
-    if (motorState[i].targetRpm > MAX_RPM) {
-      motorState[i].targetRpm = MAX_RPM;
+    if (motorState[i].targetRpm_15q16 > MAX_RPM_15Q16) {
+      motorState[i].targetRpm_15q16 = MAX_RPM_15Q16;
       
       lcd.setCursor(0,0);
       lcd.print("Motor speed max ");
     } 
-    else if (motorState[i].targetRpm < MAX_NEG_RPM) {
-      motorState[i].targetRpm = MAX_NEG_RPM;
+    else if (motorState[i].targetRpm_15q16 < MAX_NEG_RPM_15Q16) {
+      motorState[i].targetRpm_15q16 = MAX_NEG_RPM_15Q16;
 
       lcd.setCursor(0,0);
       lcd.print("Motor speed min ");
@@ -466,15 +475,17 @@ void loop() {
   for (int i = 0; i < 2; i++) {
     uint32_t freq; // todo this won't get heap allocated will it?
 
-    if (motorState[i].targetRpm > 0) {
-      digitalWrite(motorPins[i].pinDir, LOW); // todo figure out this mapping on hardware
+    if (motorState[i].targetRpm_15q16 > 0) {
+      digitalWrite(motorPins[i].pinDir, HIGH);
       motorState[i].direction = CW;  // todo get this mapping right
-      freq = (motorState[i].targetRpm * MICROSTEPS * 200) / 60;  // One revolution is 200 fullsteps, 1 Hz is 1/60 minutes
+      // Note that here I shift right to grab only the integral part out of the targetRpm_15q16, but I'm doing so after multiplying in
+      // another 1600 (maxing out at about 2^26) before dividing so as to lose less resolution. 
+      freq = (motorState[i].targetRpm_15q16 >> 16) * MICROSTEPS * 200 / 60;  // One revolution is 200 fullsteps, 1 Hz is 1/60 minutes
     } else {
-      digitalWrite(motorPins[i].pinDir, HIGH); // todo figure out this mapping
+      digitalWrite(motorPins[i].pinDir, LOW);
       motorState[i].direction = CCW; // todo get mapping right (as above)
       // todo is there a better way to abs() a signed integer than * -1?
-      freq = (-1 * motorState[i].targetRpm * MICROSTEPS * 200) / 60;
+      freq = ((-1 * motorState[i].targetRpm_15q16) >> 16) * MICROSTEPS * 200 / 60;
     }
     temp_freq_readout[i] = freq;
     setPwmFrequency(motorPins[i].pwmChannel, freq);
@@ -569,20 +580,6 @@ void direct_mode_sw_isr() {
 
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ UTILITY FUNCTIONS ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-
-const int MIN_DUTY_PCT = 35;
-const int RPM_PER_DUTY_PCT = 90;
-
-
-int dutyCycleFromRpm(int targetRpm) {
-  /*
-   * In testing of the first 4260BL I got my hands on, I observed great linearity between 35% and 85% duty cycle.
-   * This is n=1 and so I really hope that they both behave this way... really don't want to have to 
-   */
-  
-}
-
 void fault() {
   lcd.setCursor(0,0);
   lcd.print("Faulted :(");
